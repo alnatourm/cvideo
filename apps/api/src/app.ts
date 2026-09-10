@@ -8,10 +8,14 @@ import type { AuthService } from './auth/service.js';
 import { CandidateError } from './candidate/errors.js';
 import { createCandidateRouter } from './candidate/routes.js';
 import type { CandidateService } from './candidate/service.js';
+import { DiscoveryError } from './discovery/errors.js';
+import { createCandidateDiscoveryRouter, createRecruiterDiscoveryRouter } from './discovery/routes.js';
+import type { DiscoveryService } from './discovery/service.js';
 
 export interface AppOptions {
   authService?: AuthService;
   candidateService?: CandidateService;
+  discoveryService?: DiscoveryService;
   secureCookies?: boolean;
 }
 
@@ -39,6 +43,11 @@ export function createApp(options: AppOptions = {}) {
     app.use('/api/v1/candidate', createCandidateRouter(options.authService, options.candidateService));
   }
 
+  if (options.authService && options.discoveryService) {
+    app.use('/api/v1/candidate', createCandidateDiscoveryRouter(options.authService, options.discoveryService));
+    app.use('/api/v1/search/candidates', createRecruiterDiscoveryRouter(options.authService, options.discoveryService));
+  }
+
   app.use((_req, res) => {
     res.status(404).json({
       error: {
@@ -50,7 +59,7 @@ export function createApp(options: AppOptions = {}) {
   });
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-    if (error instanceof AuthError || error instanceof CandidateError) {
+    if (error instanceof AuthError || error instanceof CandidateError || error instanceof DiscoveryError) {
       res.status(error.status).json({
         error: { code: error.code, message: error.message, details: {} },
       });
