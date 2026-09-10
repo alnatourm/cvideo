@@ -14,6 +14,10 @@ function userId(req: AuthenticatedRequest) {
   return req.security!.principal.userId;
 }
 
+function stringParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? '' : value ?? '';
+}
+
 export function createCandidateRouter(authService: AuthService, candidateService: CandidateService) {
   const router = Router();
   router.use(authenticate(authService), requireRoles('candidate'));
@@ -39,11 +43,11 @@ export function createCandidateRouter(authService: AuthService, candidateService
   }));
 
   router.put('/experience/:id', asyncHandler(async (req, res) => {
-    res.json({ data: await candidateService.updateExperience(userId(req), req.params.id!, req.body) });
+    res.json({ data: await candidateService.updateExperience(userId(req), stringParam(req.params.id), req.body) });
   }));
 
   router.delete('/experience/:id', asyncHandler(async (req, res) => {
-    await candidateService.deleteExperience(userId(req), req.params.id!);
+    await candidateService.deleteExperience(userId(req), stringParam(req.params.id));
     res.status(204).end();
   }));
 
@@ -56,11 +60,11 @@ export function createCandidateRouter(authService: AuthService, candidateService
   }));
 
   router.put('/education/:id', asyncHandler(async (req, res) => {
-    res.json({ data: await candidateService.updateEducation(userId(req), req.params.id!, req.body) });
+    res.json({ data: await candidateService.updateEducation(userId(req), stringParam(req.params.id), req.body) });
   }));
 
   router.delete('/education/:id', asyncHandler(async (req, res) => {
-    await candidateService.deleteEducation(userId(req), req.params.id!);
+    await candidateService.deleteEducation(userId(req), stringParam(req.params.id));
     res.status(204).end();
   }));
 
@@ -73,11 +77,11 @@ export function createCandidateRouter(authService: AuthService, candidateService
   }));
 
   router.put('/certificates/:id', asyncHandler(async (req, res) => {
-    res.json({ data: await candidateService.updateCertificate(userId(req), req.params.id!, req.body) });
+    res.json({ data: await candidateService.updateCertificate(userId(req), stringParam(req.params.id), req.body) });
   }));
 
   router.delete('/certificates/:id', asyncHandler(async (req, res) => {
-    await candidateService.deleteCertificate(userId(req), req.params.id!);
+    await candidateService.deleteCertificate(userId(req), stringParam(req.params.id));
     res.status(204).end();
   }));
 
