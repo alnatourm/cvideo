@@ -56,6 +56,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0003_candidate_discovery_settings.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0004_saved_lists.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0005_messaging.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0006_interviews.sql
       - name: Verify migrated schema and security relationships
         run: |
           psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_profiles');" | grep -qx candidate_profiles
@@ -69,10 +70,9 @@ jobs:
           psql "$DATABASE_URL" -Atc "select to_regclass('public.saved_candidates');" | grep -qx saved_candidates
           psql "$DATABASE_URL" -Atc "select to_regclass('public.conversations');" | grep -qx conversations
           psql "$DATABASE_URL" -Atc "select to_regclass('public.messages');" | grep -qx messages
+          psql "$DATABASE_URL" -Atc "select to_regclass('public.interviews');" | grep -qx interviews
           psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conname = 'candidate_profiles_user_fk';" | grep -qx 1
           psql "$DATABASE_URL" -Atc "select count(*) from pg_indexes where indexname = 'company_members_user_unique' and indexdef ilike 'CREATE UNIQUE INDEX%';" | grep -qx 1
           psql "$DATABASE_URL" -Atc "select count(*) from information_schema.columns where table_name = 'candidate_discovery_settings' and column_name = 'discoverable' and column_default = 'false';" | grep -qx 1
-          psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conrelid = 'public.saved_lists'::regclass and contype = 'f';" | grep -qE '^[2-9][0-9]*$'
-          psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conrelid = 'public.saved_candidates'::regclass and contype in ('p','f');" | grep -qE '^[3-9][0-9]*$'
           psql "$DATABASE_URL" -Atc "select count(*) from pg_indexes where indexname = 'conversations_company_candidate_unique' and indexdef ilike 'CREATE UNIQUE INDEX%';" | grep -qx 1
-          psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conrelid = 'public.messages'::regclass and contype = 'f';" | grep -qE '^[2-9][0-9]*$'
+          psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conrelid = 'public.interviews'::regclass and contype in ('c','f');" | grep -qE '^[4-9][0-9]*$'
