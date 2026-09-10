@@ -11,6 +11,9 @@ import type { CandidateService } from './candidate/service.js';
 import { DiscoveryError } from './discovery/errors.js';
 import { createCandidateDiscoveryRouter, createRecruiterDiscoveryRouter } from './discovery/routes.js';
 import type { DiscoveryService } from './discovery/service.js';
+import { MessagingError } from './messaging/errors.js';
+import { createMessagingRouter } from './messaging/routes.js';
+import type { MessagingService } from './messaging/service.js';
 import { SavedListsError } from './saved-lists/errors.js';
 import { createSavedListsRouter } from './saved-lists/routes.js';
 import type { SavedListsService } from './saved-lists/service.js';
@@ -21,6 +24,7 @@ export interface AppOptions {
   authService?: AuthService;
   candidateService?: CandidateService;
   discoveryService?: DiscoveryService;
+  messagingService?: MessagingService;
   savedListsService?: SavedListsService;
   taxonomyService?: TaxonomyService;
   secureCookies?: boolean;
@@ -63,6 +67,10 @@ export function createApp(options: AppOptions = {}) {
     app.use('/api/v1/saved-lists', createSavedListsRouter(options.authService, options.savedListsService));
   }
 
+  if (options.authService && options.messagingService) {
+    app.use('/api/v1/conversations', createMessagingRouter(options.authService, options.messagingService));
+  }
+
   app.use((_req, res) => {
     res.status(404).json({
       error: {
@@ -78,6 +86,7 @@ export function createApp(options: AppOptions = {}) {
       error instanceof AuthError ||
       error instanceof CandidateError ||
       error instanceof DiscoveryError ||
+      error instanceof MessagingError ||
       error instanceof SavedListsError
     ) {
       res.status(error.status).json({
