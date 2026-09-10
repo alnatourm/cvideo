@@ -6,6 +6,8 @@ import { CandidateService } from './candidate/service.js';
 import { createDatabase } from './db/client.js';
 import { DrizzleDiscoveryRepository } from './discovery/drizzle-repository.js';
 import { DiscoveryService } from './discovery/service.js';
+import { DrizzleSavedListsRepository } from './saved-lists/drizzle-repository.js';
+import { SavedListsService } from './saved-lists/service.js';
 import { DrizzleTaxonomyRepository } from './taxonomy/drizzle-repository.js';
 import { TaxonomyService } from './taxonomy/service.js';
 
@@ -15,8 +17,9 @@ const { db, client } = createDatabase(databaseUrl);
 const authService = new AuthService(new DrizzleAuthRepository(db));
 const candidateService = new CandidateService(new DrizzleCandidateRepository(db));
 const discoveryService = new DiscoveryService(new DrizzleDiscoveryRepository(db));
+const savedListsService = new SavedListsService(new DrizzleSavedListsRepository(db));
 const taxonomyService = new TaxonomyService(new DrizzleTaxonomyRepository(db));
-const app = createApp({ authService, candidateService, discoveryService, taxonomyService });
+const app = createApp({ authService, candidateService, discoveryService, savedListsService, taxonomyService });
 
 const server = app.listen(port, () => {
   console.log(JSON.stringify({ level: 'info', service: 'cvideo-api', message: 'server_started', port }));
