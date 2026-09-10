@@ -30,6 +30,10 @@ function isUnsafeMethod(method: string) {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
 }
 
+function transportMatchesSession(clientType: 'web' | 'mobile', transport: 'cookie' | 'bearer') {
+  return (clientType === 'web' && transport === 'cookie') || (clientType === 'mobile' && transport === 'bearer');
+}
+
 export function authenticate(authService: AuthService): RequestHandler {
   return async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     try {
@@ -37,6 +41,10 @@ export function authenticate(authService: AuthService): RequestHandler {
       if (!credential) throw new AuthError('UNAUTHENTICATED', 401, 'Authentication required');
 
       const session = await authService.authenticateSession(credential.token);
+      if (!transportMatchesSession(session.principal.clientType, credential.transport)) {
+        throw new AuthError('UNAUTHENTICATED', 401, 'Authentication required');
+      }
+
       if (credential.transport === 'cookie' && isUnsafeMethod(req.method)) {
         authService.verifyCsrf(session, req.header('x-csrf-token') ?? undefined);
       }
