@@ -1,0 +1,16 @@
+{
+  "name": "cvideo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:web": "npm run dev -w @cvideo/web",
+    "dev:api": "npm run dev -w @cvideo/api",
+    "build": "npm run build -w @cvideo/web && npm run build -w @cvideo/api",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "test": "npm run test -ws --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
