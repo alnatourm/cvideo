@@ -11,6 +11,9 @@ import type { CandidateService } from './candidate/service.js';
 import { DiscoveryError } from './discovery/errors.js';
 import { createCandidateDiscoveryRouter, createRecruiterDiscoveryRouter } from './discovery/routes.js';
 import type { DiscoveryService } from './discovery/service.js';
+import { InterviewsError } from './interviews/errors.js';
+import { createInterviewsRouter } from './interviews/routes.js';
+import type { InterviewsService } from './interviews/service.js';
 import { MessagingError } from './messaging/errors.js';
 import { createMessagingRouter } from './messaging/routes.js';
 import type { MessagingService } from './messaging/service.js';
@@ -24,6 +27,7 @@ export interface AppOptions {
   authService?: AuthService;
   candidateService?: CandidateService;
   discoveryService?: DiscoveryService;
+  interviewsService?: InterviewsService;
   messagingService?: MessagingService;
   savedListsService?: SavedListsService;
   taxonomyService?: TaxonomyService;
@@ -39,46 +43,30 @@ export function createApp(options: AppOptions = {}) {
   app.use(cookieParser());
 
   app.get('/api/v1/health', (_req, res) => {
-    res.json({
-      status: 'ok',
-      service: 'cvideo-api',
-      version: 'v1',
-    });
+    res.json({ status: 'ok', service: 'cvideo-api', version: 'v1' });
   });
 
-  if (options.taxonomyService) {
-    app.use('/api/v1/taxonomy', createTaxonomyRouter(options.taxonomyService));
-  }
-
-  if (options.authService) {
-    app.use('/api/v1/auth', createAuthRouter(options.authService, { secureCookies: options.secureCookies }));
-  }
-
+  if (options.taxonomyService) app.use('/api/v1/taxonomy', createTaxonomyRouter(options.taxonomyService));
+  if (options.authService) app.use('/api/v1/auth', createAuthRouter(options.authService, { secureCookies: options.secureCookies }));
   if (options.authService && options.candidateService) {
     app.use('/api/v1/candidate', createCandidateRouter(options.authService, options.candidateService));
   }
-
   if (options.authService && options.discoveryService) {
     app.use('/api/v1/candidate', createCandidateDiscoveryRouter(options.authService, options.discoveryService));
     app.use('/api/v1/search/candidates', createRecruiterDiscoveryRouter(options.authService, options.discoveryService));
   }
-
   if (options.authService && options.savedListsService) {
     app.use('/api/v1/saved-lists', createSavedListsRouter(options.authService, options.savedListsService));
   }
-
   if (options.authService && options.messagingService) {
     app.use('/api/v1/conversations', createMessagingRouter(options.authService, options.messagingService));
   }
+  if (options.authService && options.interviewsService) {
+    app.use('/api/v1/interviews', createInterviewsRouter(options.authService, options.interviewsService));
+  }
 
   app.use((_req, res) => {
-    res.status(404).json({
-      error: {
-        code: 'NOT_FOUND',
-        message: 'Route not found',
-        details: {},
-      },
-    });
+    res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found', details: {} } });
   });
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
@@ -86,12 +74,11 @@ export function createApp(options: AppOptions = {}) {
       error instanceof AuthError ||
       error instanceof CandidateError ||
       error instanceof DiscoveryError ||
+      error instanceof InterviewsError ||
       error instanceof MessagingError ||
       error instanceof SavedListsError
     ) {
-      res.status(error.status).json({
-        error: { code: error.code, message: error.message, details: {} },
-      });
+      res.status(error.status).json({ error: { code: error.code, message: error.message, details: {} } });
       return;
     }
 
@@ -107,12 +94,9 @@ export function createApp(options: AppOptions = {}) {
     }
 
     console.error(JSON.stringify({ level: 'error', service: 'cvideo-api', message: 'unhandled_error' }));
-    res.status(500).json({
-      error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: {} },
-    });
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: {} } });
   };
 
   app.use(errorHandler);
-
   return app;
 }
