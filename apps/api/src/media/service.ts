@@ -1,10 +1,24 @@
 import { candidateVideoStartSchema } from '@cvideo/validation';
 import { MediaError } from './errors.js';
-import type { MediaRepository } from './repository.js';
+import type { CandidateVideoMediaRecord, MediaRepository } from './repository.js';
 import type { VideoProvider } from './provider.js';
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
 const ALLOWED_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
+
+function presentVideo(record: CandidateVideoMediaRecord) {
+  return {
+    id: record.id,
+    status: record.status,
+    playbackUrl: record.playbackUrl,
+    thumbnailUrl: record.thumbnailUrl,
+    originalFilename: record.originalFilename,
+    mimeType: record.mimeType,
+    durationSeconds: record.durationSeconds,
+    height: record.height,
+    failureReason: record.failureReason,
+  };
+}
 
 export class MediaService {
   constructor(
@@ -13,7 +27,8 @@ export class MediaService {
   ) {}
 
   async getOwnVideo(userId: string) {
-    return this.repository.getVideoByUserId(userId);
+    const record = await this.repository.getVideoByUserId(userId);
+    return record ? presentVideo(record) : null;
   }
 
   async startVideo(userId: string, input: unknown) {
@@ -43,8 +58,7 @@ export class MediaService {
     }
 
     return {
-      id: record.id,
-      status: record.status,
+      ...presentVideo(record),
       provider: this.videoProvider.name,
       uploadPath: '/api/v1/candidate/video/content',
       maxBytes: MAX_VIDEO_BYTES,
@@ -69,8 +83,8 @@ export class MediaService {
     if (!normalizedType || !ALLOWED_VIDEO_TYPES.has(normalizedType) || normalizedType !== record.mimeType) {
       throw new MediaError('VIDEO_INVALID', 422, 'Video content type does not match the upload session');
     }
-    if (contentLength !== undefined && (!Number.isFinite(contentLength) || contentLength <= 0 || contentLength > MAX_VIDEO_BYTES)) {
-      throw new MediaError('VIDEO_INVALID', 422, 'Video file size is invalid');
+    if (contentLength === undefined || !Number.isFinite(contentLength) || contentLength <= 0 || contentLength > MAX_VIDEO_BYTES) {
+      throw new MediaError('VIDEO_INVALID', 422, 'A valid Content-Length up to 250 MB is required');
     }
 
     await this.videoProvider.uploadAsset(record.providerAssetId, body, contentLength);
@@ -79,7 +93,7 @@ export class MediaService {
       failureReason: null,
     });
     if (!updated) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-    return { id: updated.id, status: updated.status };
+    return presentVideo(updated);
   }
 
   async syncVideo(userId: string) {
@@ -97,7 +111,7 @@ export class MediaService {
         failureReason: snapshot.failureReason ?? 'Video processing failed',
       });
       if (!failed) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-      return failed;
+      return presentVideo(failed);
     }
 
     if (snapshot.state === 'ready') {
@@ -111,7 +125,7 @@ export class MediaService {
           failureReason: 'Introduction Video must be 30 seconds or less and no higher than 720p',
         });
         if (!rejected) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-        return rejected;
+        return presentVideo(rejected);
       }
 
       const ready = await this.repository.updateVideoForUser(userId, {
@@ -123,7 +137,7 @@ export class MediaService {
         failureReason: null,
       });
       if (!ready) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-      return ready;
+      return presentVideo(ready);
     }
 
     const processing = await this.repository.updateVideoForUser(userId, {
@@ -133,7 +147,7 @@ export class MediaService {
       failureReason: null,
     });
     if (!processing) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-    return processing;
+    return presentVideo(processing);
   }
 
   async deleteVideo(userId: string) {
