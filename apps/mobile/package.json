@@ -10,15 +10,16 @@
     "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {
-    "expo": "latest",
-    "expo-router": "latest",
-    "react": "latest",
-    "react-native": "latest",
-    "react-native-safe-area-context": "latest",
-    "react-native-screens": "latest"
+    "expo": "~57.0.10",
+    "expo-router": "~57.0.20",
+    "react": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
-    "@types/react": "latest",
-    "typescript": "latest"
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
   }
 }
