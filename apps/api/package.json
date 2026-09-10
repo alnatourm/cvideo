@@ -14,12 +14,17 @@
   "dependencies": {
     "@cvideo/types": "workspace:*",
     "@cvideo/validation": "workspace:*",
+    "argon2": "0.44.0",
+    "cookie-parser": "1.4.7",
     "drizzle-orm": "0.45.2",
     "express": "latest",
+    "express-rate-limit": "8.1.0",
+    "helmet": "8.1.0",
     "postgres": "3.4.9",
     "zod": "latest"
   },
   "devDependencies": {
+    "@types/cookie-parser": "latest",
     "@types/express": "latest",
     "@types/node": "latest",
     "@types/supertest": "latest",

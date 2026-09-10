@@ -1,6 +1,9 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import * as schema from './schema.js';
+import * as profileSchema from './schema.js';
+import * as securitySchema from './security-schema.js';
+
+const schema = { ...profileSchema, ...securitySchema };
 
 export function createDatabase(databaseUrl: string) {
   if (!databaseUrl) {

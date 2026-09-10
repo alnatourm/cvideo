@@ -29,6 +29,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://cvideo:cvideo@localhost:5432/cvideo
+      NODE_ENV: test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,10 +49,17 @@ jobs:
         run: pnpm build
       - name: Test
         run: pnpm test
-      - name: Apply database migration
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0001_candidate_profile_core.sql
-      - name: Verify migrated schema
+      - name: Apply database migrations
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0001_candidate_profile_core.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0002_identity_tenant_security.sql
+      - name: Verify migrated schema and security relationships
         run: |
           psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_profiles');" | grep -qx candidate_profiles
           psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_videos');" | grep -qx candidate_videos
-          psql "$DATABASE_URL" -Atc "select to_regclass('public.skills');" | grep -qx skills
+          psql "$DATABASE_URL" -Atc "select to_regclass('public.users');" | grep -qx users
+          psql "$DATABASE_URL" -Atc "select to_regclass('public.companies');" | grep -qx companies
+          psql "$DATABASE_URL" -Atc "select to_regclass('public.company_members');" | grep -qx company_members
+          psql "$DATABASE_URL" -Atc "select to_regclass('public.sessions');" | grep -qx sessions
+          psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conname = 'candidate_profiles_user_fk';" | grep -qx 1
+          psql "$DATABASE_URL" -Atc "select count(*) from pg_indexes where indexname = 'company_members_user_unique' and indexdef ilike 'CREATE UNIQUE INDEX%';" | grep -qx 1
