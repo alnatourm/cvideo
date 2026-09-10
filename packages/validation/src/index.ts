@@ -45,6 +45,10 @@ export const introductionVideoMetadataSchema = z.object({
   sizeBytes: z.number().int().positive().max(250 * 1024 * 1024),
 });
 
+export const candidateVideoStartSchema = introductionVideoMetadataSchema.extend({
+  filename: z.string().trim().min(1).max(255),
+});
+
 export const candidateProfileInputSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   headline: z.string().trim().max(180).optional().nullable(),

@@ -14,6 +14,9 @@ import type { DiscoveryService } from './discovery/service.js';
 import { InterviewsError } from './interviews/errors.js';
 import { createInterviewsRouter } from './interviews/routes.js';
 import type { InterviewsService } from './interviews/service.js';
+import { MediaError } from './media/errors.js';
+import { createMediaRouter } from './media/routes.js';
+import type { MediaService } from './media/service.js';
 import { MessagingError } from './messaging/errors.js';
 import { createMessagingRouter } from './messaging/routes.js';
 import type { MessagingService } from './messaging/service.js';
@@ -28,6 +31,7 @@ export interface AppOptions {
   candidateService?: CandidateService;
   discoveryService?: DiscoveryService;
   interviewsService?: InterviewsService;
+  mediaService?: MediaService;
   messagingService?: MessagingService;
   savedListsService?: SavedListsService;
   taxonomyService?: TaxonomyService;
@@ -55,6 +59,9 @@ export function createApp(options: AppOptions = {}) {
     app.use('/api/v1/candidate', createCandidateDiscoveryRouter(options.authService, options.discoveryService));
     app.use('/api/v1/search/candidates', createRecruiterDiscoveryRouter(options.authService, options.discoveryService));
   }
+  if (options.authService && options.mediaService) {
+    app.use('/api/v1/candidate', createMediaRouter(options.authService, options.mediaService));
+  }
   if (options.authService && options.savedListsService) {
     app.use('/api/v1/saved-lists', createSavedListsRouter(options.authService, options.savedListsService));
   }
@@ -75,6 +82,7 @@ export function createApp(options: AppOptions = {}) {
       error instanceof CandidateError ||
       error instanceof DiscoveryError ||
       error instanceof InterviewsError ||
+      error instanceof MediaError ||
       error instanceof MessagingError ||
       error instanceof SavedListsError
     ) {
