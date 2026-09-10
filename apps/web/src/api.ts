@@ -55,6 +55,8 @@ export interface CandidateSearchItem {
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   introductionVideoId: string;
+  introductionVideoUrl: string | null;
+  introductionVideoThumbnailUrl: string | null;
 }
 
 export interface CandidateSearchPage {
@@ -149,7 +151,7 @@ function isUnsafe(method: string) {
 async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = init.method ?? 'GET';
   const headers = new Headers(init.headers);
-  if (init.body && !(init.body instanceof FormData) && !headers.has('content-type')) {
+  if (init.body && !(init.body instanceof FormData) && !(init.body instanceof Blob) && !headers.has('content-type')) {
     headers.set('content-type', 'application/json');
   }
   if (isUnsafe(method)) {
@@ -164,10 +166,7 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (response.status === 204) return undefined as T;
-  const payload = (await response.json().catch(() => ({}))) as {
-    data?: T;
-    error?: { code?: string; message?: string };
-  };
+  const payload = (await response.json().catch(() => ({}))) as { data?: T; error?: { code?: string; message?: string } };
   if (!response.ok) {
     throw new ApiError(response.status, payload.error?.code ?? 'REQUEST_FAILED', payload.error?.message ?? 'Request failed');
   }
@@ -200,14 +199,14 @@ export const api = {
   getCandidateProfile: () => apiRequest<CandidateProfile>('/api/v1/candidate/profile'),
   updateCandidateProfile: (input: unknown) => apiRequest<CandidateProfile>('/api/v1/candidate/profile', { method: 'PUT', body: jsonBody(input) }),
   getProfileCompleteness: () => apiRequest<{ completed: number; total: number; percent: number }>('/api/v1/candidate/profile/completeness'),
-  getVisibility: () => apiRequest<{ discoverable: boolean; ready: boolean; missing: string[] }>('/api/v1/candidate/visibility'),
-  setVisibility: (discoverable: boolean) => apiRequest<{ discoverable: boolean; ready: boolean; missing: string[] }>('/api/v1/candidate/visibility', { method: 'PUT', body: jsonBody({ discoverable }) }),
+  getVisibility: () => apiRequest<{ discoverable: boolean; ready?: boolean; missing?: string[] }>('/api/v1/candidate/visibility'),
+  setVisibility: (discoverable: boolean) => apiRequest<{ discoverable: boolean }>('/api/v1/candidate/visibility', { method: 'PUT', body: jsonBody({ discoverable }) }),
   getCandidateVideo: () => apiRequest<CandidateVideo | null>('/api/v1/candidate/video'),
   startCandidateVideo: (input: { filename: string; mimeType: string; sizeBytes: number; durationSeconds: number; height?: number }) =>
     apiRequest<CandidateVideo & { uploadPath: string; maxBytes: number }>('/api/v1/candidate/video/start', { method: 'POST', body: jsonBody(input) }),
   uploadCandidateVideo: (file: File) => apiRequest<CandidateVideo>('/api/v1/candidate/video/content', {
     method: 'PUT',
-    headers: { 'content-type': file.type, 'content-length': String(file.size) },
+    headers: { 'content-type': file.type },
     body: file,
   }),
   syncCandidateVideo: () => apiRequest<CandidateVideo>('/api/v1/candidate/video/sync', { method: 'POST' }),
