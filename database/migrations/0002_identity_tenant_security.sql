@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS company_members (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS company_members_company_user_unique
   ON company_members(company_id, user_id);
-CREATE INDEX IF NOT EXISTS company_members_user_idx ON company_members(user_id);
+-- CVIDEO v1 binds a company-member account to exactly one company tenant.
+CREATE UNIQUE INDEX IF NOT EXISTS company_members_user_unique ON company_members(user_id);
 CREATE INDEX IF NOT EXISTS company_members_company_role_idx ON company_members(company_id, role);
 
 CREATE TABLE IF NOT EXISTS sessions (
