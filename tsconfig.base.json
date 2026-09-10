@@ -8,7 +8,6 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "noUncheckedIndexedAccess": true,
-    "baseUrl": "."
+    "noUncheckedIndexedAccess": true
   }
 }
