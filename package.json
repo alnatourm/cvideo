@@ -2,17 +2,14 @@
   "name": "cvideo",
   "private": true,
   "version": "1.0.0",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.15.1",
   "scripts": {
-    "dev:web": "npm run dev -w @cvideo/web",
-    "dev:api": "npm run dev -w @cvideo/api",
-    "dev:mobile": "npm run start -w @cvideo/mobile",
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "dev:web": "pnpm --filter @cvideo/web dev",
+    "dev:api": "pnpm --filter @cvideo/api dev",
+    "dev:mobile": "pnpm --filter @cvideo/mobile start",
+    "build": "pnpm -r --if-present run build",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test"
   },
   "engines": {
     "node": ">=20"
