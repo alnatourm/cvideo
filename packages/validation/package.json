@@ -4,7 +4,15 @@
   "version": "1.0.0",
   "type": "module",
   "exports": "./src/index.ts",
-  "scripts": { "typecheck": "tsc --noEmit -p tsconfig.json --pretty false" },
-  "dependencies": { "zod": "latest" },
-  "devDependencies": { "typescript": "latest" }
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "vitest": "latest"
+  }
 }
