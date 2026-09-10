@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@types/express": "latest",
+    "@types/node": "latest",
     "tsx": "latest",
     "typescript": "latest",
     "vitest": "latest"
