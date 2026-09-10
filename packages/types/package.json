@@ -1,0 +1,9 @@
+{
+  "name": "@cvideo/types",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": { "typecheck": "tsc --noEmit -p tsconfig.json --pretty false" },
+  "devDependencies": { "typescript": "latest" }
+}

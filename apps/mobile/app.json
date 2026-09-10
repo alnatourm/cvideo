@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "CVIDEO",
+    "slug": "cvideo",
+    "scheme": "cvideo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true },
+    "ios": { "supportsTablet": true },
+    "android": { "adaptiveIcon": { "backgroundColor": "#0B132B" } }
+  }
+}

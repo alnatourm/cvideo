@@ -1,0 +1,17 @@
+{
+  "name": "cvideo",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.15.1",
+  "scripts": {
+    "dev:web": "pnpm --filter @cvideo/web dev",
+    "dev:api": "pnpm --filter @cvideo/api dev",
+    "dev:mobile": "pnpm --filter @cvideo/mobile start",
+    "build": "pnpm -r --if-present run build",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
