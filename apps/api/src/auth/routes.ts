@@ -1,4 +1,4 @@
-import { Router, type RequestHandler } from 'express';
+import { Router, type RequestHandler, type Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import type { AuthenticatedRequest } from './middleware.js';
 import { authenticate, SESSION_COOKIE } from './middleware.js';
@@ -24,7 +24,7 @@ const loginLimiter = rateLimit({
   message: { error: { code: 'RATE_LIMITED', message: 'Too many login attempts', details: {} } },
 });
 
-function asyncHandler(handler: (req: AuthenticatedRequest, res: any) => Promise<void>): RequestHandler {
+function asyncHandler(handler: (req: AuthenticatedRequest, res: Response) => Promise<void>): RequestHandler {
   return (req, res, next) => {
     void handler(req as AuthenticatedRequest, res).catch(next);
   };
@@ -32,7 +32,8 @@ function asyncHandler(handler: (req: AuthenticatedRequest, res: any) => Promise<
 
 export function createAuthRouter(authService: AuthService, options: AuthRouterOptions = {}) {
   const router = Router();
-  const secureCookies = options.secureCookies ?? process.env.NODE_ENV === 'production';
+  const isLocalRuntime = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  const secureCookies = options.secureCookies ?? !isLocalRuntime;
 
   router.post('/register/candidate', registrationLimiter, asyncHandler(async (req, res) => {
     const account = await authService.registerCandidate(req.body);
