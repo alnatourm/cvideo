@@ -62,3 +62,4 @@ jobs:
           psql "$DATABASE_URL" -Atc "select to_regclass('public.company_members');" | grep -qx company_members
           psql "$DATABASE_URL" -Atc "select to_regclass('public.sessions');" | grep -qx sessions
           psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conname = 'candidate_profiles_user_fk';" | grep -qx 1
+          psql "$DATABASE_URL" -Atc "select count(*) from pg_indexes where indexname = 'company_members_user_unique' and indexdef ilike 'CREATE UNIQUE INDEX%';" | grep -qx 1
