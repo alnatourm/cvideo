@@ -2,7 +2,6 @@ import type {
   AuthenticatedPrincipal,
   CompanyMemberRole,
   EffectiveRole,
-  SessionClientType,
 } from '@cvideo/types';
 import {
   candidateRegistrationInputSchema,
@@ -36,6 +35,8 @@ function roleForUser(user: StoredUser, membershipRole: CompanyMemberRole | null)
 }
 
 export class AuthService {
+  private readonly dummyPasswordHashPromise = hashPassword(createOpaqueToken());
+
   constructor(
     private readonly repository: AuthRepository,
     private readonly now: () => Date = () => new Date(),
@@ -88,10 +89,10 @@ export class AuthService {
   async login(input: unknown): Promise<IssuedSession> {
     const value = loginInputSchema.parse(input);
     const user = await this.repository.findUserByEmail(value.email);
+    const passwordHash = user?.passwordHash ?? (await this.dummyPasswordHashPromise);
+    const passwordMatches = await verifyPassword(passwordHash, value.password);
 
-    // A dummy Argon2 check is deliberately avoided because it would require a committed reusable hash.
-    // Rate limiting protects this endpoint; callers receive the same error for absent users and bad passwords.
-    if (!user || !(await verifyPassword(user.passwordHash, value.password))) {
+    if (!user || !passwordMatches) {
       throw new AuthError('INVALID_CREDENTIALS', 401, 'Invalid email or password');
     }
 
