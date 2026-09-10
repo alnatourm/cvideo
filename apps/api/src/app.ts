@@ -5,9 +5,13 @@ import { ZodError } from 'zod';
 import { AuthError } from './auth/errors.js';
 import { createAuthRouter } from './auth/routes.js';
 import type { AuthService } from './auth/service.js';
+import { CandidateError } from './candidate/errors.js';
+import { createCandidateRouter } from './candidate/routes.js';
+import type { CandidateService } from './candidate/service.js';
 
 export interface AppOptions {
   authService?: AuthService;
+  candidateService?: CandidateService;
   secureCookies?: boolean;
 }
 
@@ -31,6 +35,10 @@ export function createApp(options: AppOptions = {}) {
     app.use('/api/v1/auth', createAuthRouter(options.authService, { secureCookies: options.secureCookies }));
   }
 
+  if (options.authService && options.candidateService) {
+    app.use('/api/v1/candidate', createCandidateRouter(options.authService, options.candidateService));
+  }
+
   app.use((_req, res) => {
     res.status(404).json({
       error: {
@@ -42,7 +50,7 @@ export function createApp(options: AppOptions = {}) {
   });
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof CandidateError) {
       res.status(error.status).json({
         error: { code: error.code, message: error.message, details: {} },
       });
