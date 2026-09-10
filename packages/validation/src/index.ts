@@ -10,6 +10,33 @@ export const healthResponseSchema = z.object({
 
 const uuidSchema = z.string().uuid();
 const isoDateSchema = z.string().date();
+const emailSchema = z.string().trim().email().max(320).transform((value) => value.toLowerCase());
+const passwordSchema = z.string().min(12).max(128);
+
+export const loginInputSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1).max(128),
+  clientType: z.enum(['web', 'mobile']).default('web'),
+});
+
+export const candidateRegistrationInputSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  displayName: z.string().trim().min(2).max(160),
+  countryCode: z.string().trim().length(2).transform((value) => value.toUpperCase()),
+  city: z.string().trim().min(1).max(120),
+});
+
+export const companyRegistrationInputSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  companyName: z.string().trim().min(2).max(200),
+  countryCode: z.string().trim().length(2).transform((value) => value.toUpperCase()),
+  city: z.string().trim().min(1).max(120),
+  commercialRegistrationNumber: z.string().trim().min(1).max(160),
+});
+
+export const companyMemberRoleSchema = z.enum(['company_owner', 'company_admin', 'recruiter']);
 
 export const introductionVideoMetadataSchema = z.object({
   durationSeconds: z.number().nonnegative().max(30),
@@ -45,18 +72,10 @@ export const candidateExperienceInputSchema = z
   })
   .superRefine((value, ctx) => {
     if (value.isCurrent && value.endDate) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['endDate'],
-        message: 'Current experience cannot have an end date',
-      });
+      ctx.addIssue({ code: 'custom', path: ['endDate'], message: 'Current experience cannot have an end date' });
     }
     if (value.endDate && value.endDate < value.startDate) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['endDate'],
-        message: 'End date cannot be before start date',
-      });
+      ctx.addIssue({ code: 'custom', path: ['endDate'], message: 'End date cannot be before start date' });
     }
   });
 
@@ -71,11 +90,7 @@ export const candidateEducationInputSchema = z
   })
   .superRefine((value, ctx) => {
     if (value.startDate && value.endDate && value.endDate < value.startDate) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['endDate'],
-        message: 'End date cannot be before start date',
-      });
+      ctx.addIssue({ code: 'custom', path: ['endDate'], message: 'End date cannot be before start date' });
     }
   });
 
@@ -90,11 +105,7 @@ export const candidateCertificateInputSchema = z
   })
   .superRefine((value, ctx) => {
     if (value.issueDate && value.expiryDate && value.expiryDate < value.issueDate) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['expiryDate'],
-        message: 'Expiry date cannot be before issue date',
-      });
+      ctx.addIssue({ code: 'custom', path: ['expiryDate'], message: 'Expiry date cannot be before issue date' });
     }
   });
 
