@@ -1,4 +1,4 @@
-import { and, asc, eq, exists, gt, gte, ilike, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, exists, gt, gte, ilike, isNotNull, sql, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import {
   candidateCertificates,
@@ -18,6 +18,24 @@ import type {
   RecruiterSearchFilters,
   RecruiterSearchPage,
 } from './repository.js';
+
+function hasPreferredRole(db: Database) {
+  return exists(
+    db
+      .select({ value: sql`1` })
+      .from(candidatePreferredRoles)
+      .where(eq(candidatePreferredRoles.candidateId, candidateProfiles.id)),
+  );
+}
+
+function hasSkill(db: Database) {
+  return exists(
+    db
+      .select({ value: sql`1` })
+      .from(candidateSkills)
+      .where(eq(candidateSkills.candidateId, candidateProfiles.id)),
+  );
+}
 
 export class DrizzleDiscoveryRepository implements DiscoveryRepository {
   constructor(private readonly db: Database) {}
@@ -101,6 +119,10 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
     const conditions: SQL[] = [
       eq(candidateDiscoverySettings.discoverable, true),
       eq(candidateVideos.status, 'ready'),
+      isNotNull(candidateProfiles.primaryCategoryId),
+      isNotNull(candidateProfiles.primarySubcategoryId),
+      hasPreferredRole(this.db),
+      hasSkill(this.db),
     ];
 
     if (filters.countryCode) conditions.push(eq(candidateProfiles.countryCode, filters.countryCode));
@@ -206,6 +228,10 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
           eq(candidateProfiles.id, candidateId),
           eq(candidateDiscoverySettings.discoverable, true),
           eq(candidateVideos.status, 'ready'),
+          isNotNull(candidateProfiles.primaryCategoryId),
+          isNotNull(candidateProfiles.primarySubcategoryId),
+          hasPreferredRole(this.db),
+          hasSkill(this.db),
         ),
       )
       .limit(1);
