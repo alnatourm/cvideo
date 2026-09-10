@@ -11,11 +11,14 @@ import type { CandidateService } from './candidate/service.js';
 import { DiscoveryError } from './discovery/errors.js';
 import { createCandidateDiscoveryRouter, createRecruiterDiscoveryRouter } from './discovery/routes.js';
 import type { DiscoveryService } from './discovery/service.js';
+import { createTaxonomyRouter } from './taxonomy/routes.js';
+import type { TaxonomyService } from './taxonomy/service.js';
 
 export interface AppOptions {
   authService?: AuthService;
   candidateService?: CandidateService;
   discoveryService?: DiscoveryService;
+  taxonomyService?: TaxonomyService;
   secureCookies?: boolean;
 }
 
@@ -34,6 +37,10 @@ export function createApp(options: AppOptions = {}) {
       version: 'v1',
     });
   });
+
+  if (options.taxonomyService) {
+    app.use('/api/v1/taxonomy', createTaxonomyRouter(options.taxonomyService));
+  }
 
   if (options.authService) {
     app.use('/api/v1/auth', createAuthRouter(options.authService, { secureCookies: options.secureCookies }));
