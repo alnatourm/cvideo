@@ -13,6 +13,22 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cvideo
+          POSTGRES_PASSWORD: cvideo
+          POSTGRES_DB: cvideo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://cvideo:cvideo@localhost:5432/cvideo
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,3 +48,10 @@ jobs:
         run: pnpm build
       - name: Test
         run: pnpm test
+      - name: Apply database migration
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0001_candidate_profile_core.sql
+      - name: Verify migrated schema
+        run: |
+          psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_profiles');" | grep -qx candidate_profiles
+          psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_videos');" | grep -qx candidate_videos
+          psql "$DATABASE_URL" -Atc "select to_regclass('public.skills');" | grep -qx skills
