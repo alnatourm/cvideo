@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#FFF', fontWeight: '900' },
   flex: { flex: 1, minWidth: 0 },
-  conversationTitle: { color: colors.ink, fontWeight: '850' },
+  conversationTitle: { color: colors.ink, fontWeight: '800' },
   meta: { color: colors.muted, fontSize: 11, marginTop: 3 },
   empty: { color: colors.muted, textAlign: 'center', paddingVertical: 18 },
   messageList: { gap: 8 },
