@@ -155,7 +155,7 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set('content-type', 'application/json');
   }
   if (isUnsafe(method)) {
-    const csrf = sessionStorage.getItem(CSRF_KEY);
+    const csrf = localStorage.getItem(CSRF_KEY);
     if (csrf) headers.set('x-csrf-token', csrf);
   }
 
@@ -183,13 +183,16 @@ export const api = {
       method: 'POST',
       body: jsonBody({ email, password, clientType: 'web' }),
     });
-    sessionStorage.setItem(CSRF_KEY, result.csrfToken);
+    localStorage.setItem(CSRF_KEY, result.csrfToken);
     return result;
   },
   me: () => apiRequest<{ principal: Principal }>('/api/v1/auth/me'),
   async logout() {
-    await apiRequest<void>('/api/v1/auth/logout', { method: 'POST' });
-    sessionStorage.removeItem(CSRF_KEY);
+    try {
+      await apiRequest<void>('/api/v1/auth/logout', { method: 'POST' });
+    } finally {
+      localStorage.removeItem(CSRF_KEY);
+    }
   },
   registerCandidate: (input: { email: string; password: string; displayName: string; countryCode: string; city: string }) =>
     apiRequest<unknown>('/api/v1/auth/register/candidate', { method: 'POST', body: jsonBody(input) }),
