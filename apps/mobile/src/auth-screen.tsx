@@ -73,7 +73,7 @@ export function AuthScreen({
   return (
     <Screen>
       <TopBar locale={locale} setLocale={setLocale} />
-      <View style={[styles.hero, rtl && styles.rtl]}>
+      <View style={styles.hero}>
         <Text style={styles.eyebrow}>{tx(locale, 'REVERSE EMPLOYMENT', 'التوظيف العكسي')}</Text>
         <Text style={[styles.title, rtl && styles.rtl]}>{tx(locale, 'Meet the person before the CV.', 'تعرّف على الشخص قبل السيرة الذاتية.')}</Text>
         <Text style={[styles.body, rtl && styles.rtl]}>{tx(locale, 'Candidates publish a 30-second professional introduction. Companies search, watch, save, chat and request interviews.', 'ينشر المرشح فيديو تعريفيًا مهنيًا مدته 30 ثانية. تبحث الشركات وتشاهد وتحفظ وتتواصل وتطلب المقابلات.')}</Text>
