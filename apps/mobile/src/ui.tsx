@@ -208,7 +208,7 @@ export const styles = StyleSheet.create({
   primary: { minHeight: 49, paddingHorizontal: 18, borderRadius: 13, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: '#FFF', fontWeight: '900', fontSize: 14 },
   secondary: { minHeight: 49, paddingHorizontal: 18, borderRadius: 13, backgroundColor: '#FFF', borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
-  secondaryText: { color: colors.ink, fontWeight: '850', fontSize: 14 },
+  secondaryText: { color: colors.ink, fontWeight: '800', fontSize: 14 },
   dim: { opacity: .55 },
   notice: { padding: 12, borderRadius: 12, borderWidth: 1 },
   noticeError: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
