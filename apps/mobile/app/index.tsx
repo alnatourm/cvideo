@@ -1,41 +1,71 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { api, getSessionToken, type Locale, type Principal } from '../src/api';
+import { AuthScreen } from '../src/auth-screen';
+import { CandidateApp } from '../src/candidate-app';
+import { CompanyApp } from '../src/company-app';
+import { Loading, PageTitle, Screen, TopBar, colors, tx } from '../src/ui';
 
 export default function HomeScreen() {
+  const [principal, setPrincipal] = useState<Principal | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [locale, setLocale] = useState<Locale>('ar');
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const token = await getSessionToken();
+        if (!token) return;
+        const result = await api.me();
+        if (active) setPrincipal(result.principal);
+      } catch {
+        // A missing, expired, or revoked session returns to the login screen.
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  async function logout() {
+    try { await api.logout(); } finally { setPrincipal(null); }
+  }
+
+  if (loading) return <Loading label="CVIDEO" />;
+  if (!principal) return <AuthScreen locale={locale} setLocale={setLocale} onSignedIn={setPrincipal} />;
+  if (principal.effectiveRole === 'candidate') {
+    return <CandidateApp principal={principal} locale={locale} setLocale={setLocale} onLogout={() => void logout()} />;
+  }
+  if (principal.effectiveRole === 'super_admin') {
+    return <AdminMobileBoundary locale={locale} setLocale={setLocale} onLogout={() => void logout()} />;
+  }
+  return <CompanyApp principal={principal} locale={locale} setLocale={setLocale} onLogout={() => void logout()} />;
+}
+
+function AdminMobileBoundary({ locale, setLocale, onLogout }: { locale: Locale; setLocale: (locale: Locale) => void; onLogout: () => void }) {
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}><Text style={styles.brand}>CVIDEO</Text><Text style={styles.badge}>Candidate preview</Text></View>
-        <Text style={styles.eyebrow}>REVERSE EMPLOYMENT</Text>
-        <Text style={styles.title}>Get discovered before a vacancy exists.</Text>
-        <Text style={styles.body}>Create your professional profile, add a 30-second introduction video, and let companies find you.</Text>
-        <View style={styles.video}><Text style={styles.videoLabel}>30s Introduction Video</Text><Text style={styles.play}>▶</Text></View>
-        <View style={styles.card}><Text style={styles.name}>Your professional profile</Text><Text style={styles.meta}>Skills · Experience · Certificates · Preferred Roles</Text><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>Build Profile</Text></TouchableOpacity></View>
-        <View style={styles.nav}><Text style={styles.navActive}>Home</Text><Text style={styles.navItem}>Messages</Text><Text style={styles.navItem}>Profile</Text></View>
-        <Text style={styles.note}>Phase 1 visual shell only. Authentication and protected data are intentionally not implemented.</Text>
-      </ScrollView>
-    </SafeAreaView>
+    <Screen>
+      <TopBar locale={locale} setLocale={setLocale} right={<Pressable style={styles.logout} onPress={onLogout}><Text style={styles.logoutText}>{tx(locale, 'Logout', 'خروج')}</Text></Pressable>} />
+      <PageTitle
+        locale={locale}
+        eyebrow={tx(locale, 'PROTECTED ADMIN', 'الإدارة المحمية')}
+        title={tx(locale, 'Admin remains a dedicated web workspace', 'لوحة الإدارة تبقى مساحة ويب مخصصة')}
+        body={tx(locale, 'CVIDEO mobile v1 is for candidates and company users. Administrative verification and platform controls stay behind the protected /admin web boundary.', 'تطبيق CVIDEO للهاتف في الإصدار الأول مخصص للمرشحين ومستخدمي الشركات. تبقى التحقق والإدارة والتحكم بالمنصة خلف مسار الويب المحمي /admin.')}
+      />
+      <View style={styles.adminCard}>
+        <Text style={[styles.adminTitle, locale === 'ar' && styles.rtl]}>{tx(locale, 'No admin actions are exposed in the mobile client.', 'لا يتم عرض إجراءات الإدارة في تطبيق الهاتف.')}</Text>
+        <Text style={[styles.adminBody, locale === 'ar' && styles.rtl]}>{tx(locale, 'This is intentional separation, not a missing permission check.', 'هذا فصل مقصود للواجهات وليس نقصًا في التحقق من الصلاحيات.')}</Text>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, gap: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brand: { color: '#0B132B', fontWeight: '900', letterSpacing: 2, fontSize: 20 },
-  badge: { color: '#2563EB', fontWeight: '700', fontSize: 12 },
-  eyebrow: { color: '#2563EB', fontWeight: '800', letterSpacing: 1.5, fontSize: 11, marginTop: 20 },
-  title: { color: '#0F172A', fontSize: 36, lineHeight: 40, fontWeight: '900' },
-  body: { color: '#64748B', fontSize: 16, lineHeight: 24 },
-  video: { minHeight: 420, backgroundColor: '#0B132B', borderRadius: 24, padding: 18, justifyContent: 'space-between' },
-  videoLabel: { color: '#FFFFFF', fontWeight: '800', alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
-  play: { color: '#22D3EE', fontSize: 44, alignSelf: 'center', marginBottom: 160 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-  name: { color: '#0F172A', fontWeight: '900', fontSize: 20 },
-  meta: { color: '#64748B', lineHeight: 20 },
-  primary: { backgroundColor: '#2563EB', minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, marginTop: 4 },
-  primaryText: { color: '#FFFFFF', fontWeight: '900' },
-  nav: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#0B132B', borderRadius: 18, paddingVertical: 16 },
-  navActive: { color: '#22D3EE', fontWeight: '900' },
-  navItem: { color: '#CBD5E1', fontWeight: '700' },
-  note: { color: '#64748B', fontSize: 12, textAlign: 'center', marginBottom: 12 },
+  rtl: { textAlign: 'right', writingDirection: 'rtl' },
+  logout: { minHeight: 36, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.line, backgroundColor: '#FFF', justifyContent: 'center' },
+  logoutText: { color: colors.ink, fontWeight: '800', fontSize: 11 },
+  adminCard: { backgroundColor: '#FFF', borderWidth: 1, borderColor: colors.line, padding: 20, borderRadius: 18, gap: 8 },
+  adminTitle: { color: colors.ink, fontWeight: '900', fontSize: 18 },
+  adminBody: { color: colors.muted, lineHeight: 21 },
 });
