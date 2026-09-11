@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   videoHint: { color: '#94A3B8', textAlign: 'center', lineHeight: 18, marginTop: 12, fontSize: 11 },
   empty: { color: colors.muted, textAlign: 'center', paddingVertical: 18 },
   interview: { gap: 10, paddingTop: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: colors.line },
-  interviewTitle: { color: colors.ink, fontWeight: '850', fontSize: 16, marginTop: 6 },
+  interviewTitle: { color: colors.ink, fontWeight: '800', fontSize: 16, marginTop: 6 },
   meta: { color: colors.muted, fontSize: 11, lineHeight: 17 },
   link: { color: colors.blue, fontSize: 11, marginTop: 4 },
   actions: { flexDirection: 'row', gap: 8 },
@@ -278,6 +278,6 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   chip: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: '#FFF' },
   chipActive: { borderColor: '#60A5FA', backgroundColor: '#EFF6FF' },
-  chipText: { color: '#475569', fontWeight: '750', fontSize: 11 },
+  chipText: { color: '#475569', fontWeight: '700', fontSize: 11 },
   chipTextActive: { color: colors.blue },
 });
