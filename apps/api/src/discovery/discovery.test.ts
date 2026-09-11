@@ -15,34 +15,25 @@ class MemoryDiscoveryRepository implements DiscoveryRepository {
   };
   visible = false;
 
-  async getReadinessByUserId() {
-    return this.readiness;
-  }
-
-  async getVisibilityByUserId() {
-    return this.visible;
-  }
-
-  async setVisibilityByUserId(_userId: string, discoverable: boolean) {
-    this.visible = discoverable;
-    return this.visible;
-  }
+  async getReadinessByUserId() { return this.readiness; }
+  async getVisibilityByUserId() { return this.visible; }
+  async setVisibilityByUserId(_userId: string, discoverable: boolean) { this.visible = discoverable; return this.visible; }
 
   async searchCandidates(filters: RecruiterSearchFilters) {
     return {
-      items: [
-        {
-          id: '11111111-1111-4111-8111-111111111111',
-          displayName: 'Candidate One',
-          headline: 'Sales Manager',
-          countryCode: filters.countryCode ?? 'JO',
-          city: 'Amman',
-          yearsExperience: 8,
-          primaryCategoryId: null,
-          primarySubcategoryId: null,
-          introductionVideoId: '22222222-2222-4222-8222-222222222222',
-        },
-      ],
+      items: [{
+        id: '11111111-1111-4111-8111-111111111111',
+        displayName: 'Candidate One',
+        headline: 'Sales Manager',
+        countryCode: filters.countryCode ?? 'JO',
+        city: 'Amman',
+        yearsExperience: 8,
+        primaryCategoryId: null,
+        primarySubcategoryId: null,
+        introductionVideoId: '22222222-2222-4222-8222-222222222222',
+        introductionVideoUrl: 'https://video.example/playlist.m3u8',
+        introductionVideoThumbnailUrl: 'https://video.example/thumb.jpg',
+      }],
       nextCursor: null,
     };
   }
@@ -59,6 +50,8 @@ class MemoryDiscoveryRepository implements DiscoveryRepository {
       primaryCategoryId: null,
       primarySubcategoryId: null,
       introductionVideoId: '22222222-2222-4222-8222-222222222222',
+      introductionVideoUrl: 'https://video.example/playlist.m3u8',
+      introductionVideoThumbnailUrl: 'https://video.example/thumb.jpg',
       professionalSummary: 'Professional summary',
       preferredRoleIds: [],
       skillIds: [],
@@ -97,35 +90,26 @@ describe('CVIDEO discovery', () => {
   it('does not allow discovery until the candidate has a ready Introduction Video', async () => {
     const repo = new MemoryDiscoveryRepository();
     const service = new DiscoveryService(repo);
-
-    await expect(service.setOwnVisibility('candidate-user', { discoverable: true })).rejects.toMatchObject({
-      code: 'DISCOVERY_NOT_READY',
-      status: 409,
-    });
-
+    await expect(service.setOwnVisibility('candidate-user', { discoverable: true })).rejects.toMatchObject({ code: 'DISCOVERY_NOT_READY', status: 409 });
     repo.readiness.hasReadyVideo = true;
-    await expect(service.setOwnVisibility('candidate-user', { discoverable: true })).resolves.toEqual({
-      discoverable: true,
-    });
+    await expect(service.setOwnVisibility('candidate-user', { discoverable: true })).resolves.toEqual({ discoverable: true });
   });
 
-  it('blocks candidates from recruiter search and allows authenticated company recruiters', async () => {
+  it('blocks candidates from recruiter search and returns only recruiter-safe playback data', async () => {
     const repo = new MemoryDiscoveryRepository();
     repo.readiness.hasReadyVideo = true;
     const app = createApp({ authService: authServiceStub(), discoveryService: new DiscoveryService(repo) });
 
-    const blocked = await request(app)
-      .get('/api/v1/search/candidates')
-      .set('authorization', 'Bearer candidate-token');
+    const blocked = await request(app).get('/api/v1/search/candidates').set('authorization', 'Bearer candidate-token');
     expect(blocked.status).toBe(403);
 
-    const allowed = await request(app)
-      .get('/api/v1/search/candidates?countryCode=jo&pageSize=10')
-      .set('authorization', 'Bearer recruiter-token');
+    const allowed = await request(app).get('/api/v1/search/candidates?countryCode=jo&pageSize=10').set('authorization', 'Bearer recruiter-token');
     expect(allowed.status).toBe(200);
     expect(allowed.body.data.items).toHaveLength(1);
     expect(allowed.body.data.items[0].countryCode).toBe('JO');
+    expect(allowed.body.data.items[0].introductionVideoUrl).toContain('playlist.m3u8');
     expect(allowed.body.data.items[0].passwordHash).toBeUndefined();
     expect(allowed.body.data.items[0].email).toBeUndefined();
+    expect(allowed.body.data.items[0].storageKey).toBeUndefined();
   });
 });

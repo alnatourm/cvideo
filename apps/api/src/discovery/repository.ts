@@ -16,6 +16,8 @@ export interface RecruiterCandidateCard {
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   introductionVideoId: string;
+  introductionVideoUrl: string | null;
+  introductionVideoThumbnailUrl: string | null;
 }
 
 export interface RecruiterCandidateDetail extends RecruiterCandidateCard {
