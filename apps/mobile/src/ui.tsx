@@ -67,10 +67,10 @@ export function TopBar({
 
 export function PageTitle({ locale, eyebrow, title, body }: { locale: Locale; eyebrow: string; title: string; body?: string }) {
   return (
-    <View style={[styles.pageTitle, locale === 'ar' && styles.rtl]}>
-      <Text style={styles.eyebrow}>{eyebrow}</Text>
-      <Text style={styles.title}>{title}</Text>
-      {body ? <Text style={styles.body}>{body}</Text> : null}
+    <View style={styles.pageTitle}>
+      <Text style={[styles.eyebrow, locale === 'ar' && styles.rtl]}>{eyebrow}</Text>
+      <Text style={[styles.title, locale === 'ar' && styles.rtl]}>{title}</Text>
+      {body ? <Text style={[styles.body, locale === 'ar' && styles.rtl]}>{body}</Text> : null}
     </View>
   );
 }
