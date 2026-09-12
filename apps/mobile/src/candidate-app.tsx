@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import {
   api,
   ApiError,
@@ -27,6 +28,7 @@ import {
   colors,
   tx,
 } from './ui';
+import { prepareVideoAsset } from './video-upload';
 
 type Tab = 'home' | 'messages' | 'profile';
 
@@ -126,6 +128,86 @@ export function CandidateApp({
 
   useEffect(() => { void load(); }, []);
 
+  useEffect(() => {
+    if (video?.status !== 'processing' && video?.status !== 'uploading') return;
+    const timer = setInterval(() => { void refreshVideo(true); }, 6000);
+    return () => clearInterval(timer);
+  }, [video?.status, video?.id]);
+
+  async function refreshVideo(silent = false) {
+    if (!silent) { setBusy('video'); setError(''); }
+    try {
+      const updated = await api.syncCandidateVideo();
+      setVideo(updated);
+      if (updated.status === 'ready') setNotice(tx(locale, 'Your Introduction Video is ready.', 'الفيديو التعريفي جاهز.'));
+      if (updated.status === 'rejected' || updated.status === 'failed') setError(updated.failureReason ?? tx(locale, 'Video processing failed.', 'فشلت معالجة الفيديو.'));
+    } catch (err) {
+      if (!silent) setError(errorMessage(locale, err));
+    } finally {
+      if (!silent) setBusy('');
+    }
+  }
+
+  async function chooseVideo(source: 'camera' | 'library') {
+    setError(''); setNotice('');
+    try {
+      const permission = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) throw new Error(tx(locale, 'Permission is required to choose or record your Introduction Video.', 'يلزم السماح لاختيار أو تسجيل الفيديو التعريفي.'));
+
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['videos'],
+        allowsEditing: false,
+        videoMaxDuration: 30,
+        videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
+      };
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ ...options, cameraType: ImagePicker.CameraType.front })
+        : await ImagePicker.launchImageLibraryAsync(options);
+      if (result.canceled || !result.assets[0]) return;
+
+      const selected = prepareVideoAsset(result.assets[0]);
+      setBusy('video');
+      const started = await api.startCandidateVideo({
+        filename: selected.filename,
+        mimeType: selected.mimeType,
+        sizeBytes: selected.sizeBytes,
+        durationSeconds: selected.durationSeconds,
+        height: selected.resolution,
+      });
+      setVideo(started);
+      const processing = await api.uploadCandidateVideo(selected.uri, selected.mimeType, selected.sizeBytes);
+      setVideo(processing);
+      setNotice(tx(locale, 'Upload complete. Your video is processing.', 'اكتمل الرفع. الفيديو قيد المعالجة.'));
+    } catch (err) {
+      setError(errorMessage(locale, err));
+    } finally {
+      setBusy('');
+    }
+  }
+
+  function confirmDeleteVideo() {
+    Alert.alert(
+      tx(locale, 'Delete Introduction Video?', 'حذف الفيديو التعريفي؟'),
+      tx(locale, 'Your profile will stop being discoverable until a new video is ready.', 'سيتوقف ظهور ملفك حتى يصبح فيديو جديد جاهزًا.'),
+      [
+        { text: tx(locale, 'Cancel', 'إلغاء'), style: 'cancel' },
+        { text: tx(locale, 'Delete', 'حذف'), style: 'destructive', onPress: () => { void deleteVideo(); } },
+      ],
+    );
+  }
+
+  async function deleteVideo() {
+    setBusy('video'); setError(''); setNotice('');
+    try {
+      await api.deleteCandidateVideo();
+      setVideo(null);
+      setDiscoverable(false);
+      setNotice(tx(locale, 'Introduction Video deleted.', 'تم حذف الفيديو التعريفي.'));
+    } catch (err) { setError(errorMessage(locale, err)); } finally { setBusy(''); }
+  }
+
   async function toggleDiscovery() {
     setBusy('visibility'); setError(''); setNotice('');
     try {
@@ -192,7 +274,13 @@ export function CandidateApp({
             </View>
             <Card>
               <View style={styles.cardHead}><View style={styles.flex}><Text style={[styles.eyebrow, rtl && styles.rtl]}>{tx(locale, '30s INTRODUCTION VIDEO', 'فيديو تعريفي 30 ثانية')}</Text><Text style={[styles.cardTitle, rtl && styles.rtl]}>{tx(locale, 'Your first impression', 'انطباعك الأول')}</Text></View><StatusPill value={video?.status ?? 'missing'} /></View>
-              {video?.status === 'ready' && video.playbackUrl ? <NativeVideo uri={video.playbackUrl} poster={video.thumbnailUrl} /> : <View style={styles.videoEmpty}><Text style={styles.videoNumber}>30</Text><Text style={styles.videoEmptyText}>{tx(locale, 'seconds maximum', 'ثانية كحد أقصى')}</Text><Text style={styles.videoHint}>{tx(locale, 'Video upload from mobile is the next native-media slice. Your existing web upload is already connected to Bunny Stream.', 'رفع الفيديو من الهاتف هو شريحة الوسائط الأصلية التالية. رفع الويب الحالي متصل بالفعل بـ Bunny Stream.')}</Text></View>}
+              {video?.status === 'ready' && video.playbackUrl ? <NativeVideo uri={video.playbackUrl} poster={video.thumbnailUrl} /> : <View style={styles.videoEmpty}><Text style={styles.videoNumber}>30</Text><Text style={styles.videoEmptyText}>{tx(locale, 'seconds maximum', 'ثانية كحد أقصى')}</Text><Text style={styles.videoHint}>{video?.status === 'processing' || video?.status === 'uploading' ? tx(locale, 'Upload received. Bunny Stream is preparing secure playback.', 'تم استلام الفيديو. يجري تجهيز التشغيل الآمن.') : tx(locale, 'Record now or choose an MP4, MOV, or WebM video at 720p or lower.', 'سجّل الآن أو اختر فيديو MP4 أو MOV أو WebM بدقة 720p أو أقل.')}</Text></View>}
+              <View style={styles.videoActions}>
+                <View style={styles.flex}><PrimaryButton label={busy === 'video' ? tx(locale, 'Working…', 'جاري التنفيذ…') : tx(locale, 'Record video', 'تسجيل فيديو')} onPress={() => void chooseVideo('camera')} disabled={busy === 'video'} /></View>
+                <View style={styles.flex}><SecondaryButton label={tx(locale, video ? 'Replace' : 'Choose video', video ? 'استبدال' : 'اختيار فيديو')} onPress={() => void chooseVideo('library')} disabled={busy === 'video'} /></View>
+              </View>
+              {video?.status === 'processing' || video?.status === 'uploading' ? <SecondaryButton label={tx(locale, 'Check processing', 'فحص المعالجة')} onPress={() => void refreshVideo()} disabled={busy === 'video'} /> : null}
+              {video ? <Pressable style={styles.deleteVideo} onPress={confirmDeleteVideo} disabled={busy === 'video'}><Text style={styles.deleteVideoText}>{tx(locale, 'Delete Introduction Video', 'حذف الفيديو التعريفي')}</Text></Pressable> : null}
             </Card>
             <Card>
               <Text style={[styles.eyebrow, rtl && styles.rtl]}>{tx(locale, 'DISCOVERY', 'الظهور في البحث')}</Text>
@@ -267,6 +355,9 @@ const styles = StyleSheet.create({
   videoNumber: { color: colors.cyan, fontSize: 64, fontWeight: '900' },
   videoEmptyText: { color: '#FFF', fontWeight: '800' },
   videoHint: { color: '#94A3B8', textAlign: 'center', lineHeight: 18, marginTop: 12, fontSize: 11 },
+  videoActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  deleteVideo: { alignItems: 'center', paddingVertical: 10 },
+  deleteVideoText: { color: '#B91C1C', fontWeight: '800', fontSize: 12 },
   empty: { color: colors.muted, textAlign: 'center', paddingVertical: 18 },
   interview: { gap: 10, paddingTop: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: colors.line },
   interviewTitle: { color: colors.ink, fontWeight: '800', fontSize: 16, marginTop: 6 },
