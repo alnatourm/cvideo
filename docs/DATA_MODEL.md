@@ -176,6 +176,17 @@ Unique active company + user relationship according to membership policy.
 - created_at
 - updated_at
 
+### audit_events
+- id
+- actor_user_id nullable only if the actor account is later removed
+- action
+- target_type
+- target_id
+- metadata JSON
+- created_at
+
+Company verification decisions and operational active/suspended changes create audit events. `companies.operational_status` is separate from verification status so a verified company can still be suspended without rewriting its verification history.
+
 ## Discovery
 ### candidate_view_events
 - id

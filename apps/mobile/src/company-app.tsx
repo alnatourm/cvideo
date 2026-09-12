@@ -5,6 +5,7 @@ import {
   ApiError,
   type CandidateDetail,
   type CandidateSearchItem,
+  type CompanyVerificationStatus,
   type Interview,
   type Locale,
   type Principal,
@@ -56,6 +57,7 @@ export function CompanyApp({
   const [newListName, setNewListName] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [verification, setVerification] = useState<CompanyVerificationStatus | null>(null);
   const [showInterview, setShowInterview] = useState(false);
   const [interviewTitle, setInterviewTitle] = useState('');
   const [interviewDate, setInterviewDate] = useState('');
@@ -77,9 +79,10 @@ export function CompanyApp({
 
   async function loadWorkspace() {
     try {
-      const [nextLists, nextInterviews] = await Promise.all([api.savedLists(), api.interviews()]);
+      const [nextLists, nextInterviews, nextVerification] = await Promise.all([api.savedLists(), api.interviews(), api.companyVerification()]);
       setLists(nextLists);
       setInterviews(nextInterviews);
+      setVerification(nextVerification);
       if (nextLists[0]) setSelectedList(await api.savedList(nextLists[0].id));
     } catch (err) {
       setError(errorMessage(locale, err));
@@ -241,8 +244,9 @@ export function CompanyApp({
         {tab === 'account' ? (
           <>
             <PageTitle locale={locale} eyebrow={tx(locale, 'COMPANY ACCOUNT', 'حساب الشركة')} title={tx(locale, 'Company workspace', 'مساحة الشركة')} body={tx(locale, 'Role, tenant identity and interview activity.', 'الدور وهوية الشركة ونشاط المقابلات.')} />
-            <View style={styles.metrics}><Metric locale={locale} label={tx(locale, 'Role', 'الدور')} value={principal.effectiveRole.replaceAll('_',' ')} /><Metric locale={locale} label={tx(locale, 'Interviews', 'المقابلات')} value={String(interviews.length)} /></View>
+            <View style={styles.metrics}><Metric locale={locale} label={tx(locale, 'Role', 'الدور')} value={principal.effectiveRole.replaceAll('_',' ')} /><Metric locale={locale} label={tx(locale, 'Verification', 'التحقق')} value={verification?.verificationStatus ?? '—'} /><Metric locale={locale} label={tx(locale, 'Interviews', 'المقابلات')} value={String(interviews.length)} /></View>
             <Card><Text style={[styles.sectionLabel, rtl && styles.rtl]}>{tx(locale, 'Company tenant', 'هوية الشركة')}</Text><Text style={[styles.mono, rtl && styles.rtl]}>{principal.companyId ?? '—'}</Text></Card>
+            {verification ? <Card><Text style={[styles.cardTitle, rtl && styles.rtl]}>{verification.companyName}</Text><StatusPill value={verification.verificationStatus} /><Text style={[styles.meta, rtl && styles.rtl]}>{verification.countryCode} · {verification.commercialRegistrationNumber}</Text>{verification.rejectionReason ? <Text style={[styles.remove, rtl && styles.rtl]}>{verification.rejectionReason}</Text> : null}</Card> : null}
             <Card><Text style={[styles.cardTitle, rtl && styles.rtl]}>{tx(locale, 'Interview activity', 'نشاط المقابلات')}</Text>{interviews.length === 0 ? <Text style={[styles.empty, rtl && styles.rtl]}>{tx(locale, 'No interviews yet.', 'لا توجد مقابلات بعد.')}</Text> : interviews.slice(0,10).map((item) => <View key={item.id} style={styles.interviewRow}><StatusPill value={item.status} /><Text style={[styles.interviewTitle, rtl && styles.rtl]}>{item.opportunityTitle}</Text><Text style={[styles.meta, rtl && styles.rtl]}>{new Date(item.startsAtUtc).toLocaleString()}</Text></View>)}</Card>
           </>
         ) : null}

@@ -1,5 +1,6 @@
 import {
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -22,6 +23,7 @@ export const companyVerificationStatusEnum = pgEnum('company_verification_status
   'verified',
   'rejected',
 ]);
+export const companyOperationalStatusEnum = pgEnum('company_operational_status', ['active', 'suspended']);
 export const sessionClientTypeEnum = pgEnum('session_client_type', ['web', 'mobile']);
 
 export const users = pgTable(
@@ -52,6 +54,7 @@ export const companies = pgTable(
     logoUrl: text('logo_url'),
     description: text('description'),
     verificationStatus: companyVerificationStatusEnum('verification_status').notNull().default('pending'),
+    operationalStatus: companyOperationalStatusEnum('operational_status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -59,6 +62,42 @@ export const companies = pgTable(
     uniqueIndex('companies_country_crn_unique').on(table.countryCode, table.commercialRegistrationNumber),
     index('companies_verification_status_idx').on(table.verificationStatus),
   ],
+);
+
+export const companyVerifications = pgTable(
+  'company_verifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    submittedByUserId: uuid('submitted_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    status: companyVerificationStatusEnum('status').notNull().default('pending'),
+    commercialRegistrationNumber: varchar('commercial_registration_number', { length: 160 }).notNull(),
+    documentKey: text('document_key'),
+    reviewedByAdminUserId: uuid('reviewed_by_admin_user_id').references(() => users.id, { onDelete: 'set null' }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    rejectionReason: text('rejection_reason'),
+    reviewNote: text('review_note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('company_verifications_status_created_idx').on(table.status, table.createdAt),
+    index('company_verifications_company_idx').on(table.companyId),
+  ],
+);
+
+export const auditEvents = pgTable(
+  'audit_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    action: varchar('action', { length: 120 }).notNull(),
+    targetType: varchar('target_type', { length: 80 }).notNull(),
+    targetId: uuid('target_id').notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('audit_events_target_idx').on(table.targetType, table.targetId), index('audit_events_created_idx').on(table.createdAt)],
 );
 
 export const companyMembers = pgTable(

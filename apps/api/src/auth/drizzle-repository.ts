@@ -1,7 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { candidateProfiles } from '../db/schema.js';
-import { companies, companyMembers, sessions, users } from '../db/security-schema.js';
+import { companies, companyMembers, companyVerifications, sessions, users } from '../db/security-schema.js';
 import type {
   AuthRepository,
   CandidateRegistrationRecord,
@@ -115,6 +115,13 @@ export class DrizzleAuthRepository implements AuthRepository {
         .returning();
       if (!membership) throw new Error('Failed to create company owner membership');
 
+      await tx.insert(companyVerifications).values({
+        companyId: company.id,
+        submittedByUserId: user.id,
+        status: 'pending',
+        commercialRegistrationNumber: company.commercialRegistrationNumber,
+      });
+
       return {
         user: mapUser(user),
         companyId: company.id,
@@ -125,9 +132,18 @@ export class DrizzleAuthRepository implements AuthRepository {
 
   async findActiveMembershipByUserId(userId: string): Promise<StoredCompanyMembership | null> {
     const [row] = await this.db
-      .select()
+      .select({
+        id: companyMembers.id,
+        companyId: companyMembers.companyId,
+        userId: companyMembers.userId,
+        role: companyMembers.role,
+        status: companyMembers.status,
+        createdAt: companyMembers.createdAt,
+        updatedAt: companyMembers.updatedAt,
+      })
       .from(companyMembers)
-      .where(and(eq(companyMembers.userId, userId), eq(companyMembers.status, 'active')))
+      .innerJoin(companies, eq(companies.id, companyMembers.companyId))
+      .where(and(eq(companyMembers.userId, userId), eq(companyMembers.status, 'active'), eq(companies.operationalStatus, 'active')))
       .limit(1);
     return row ? mapMembership(row) : null;
   }
