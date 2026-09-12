@@ -43,8 +43,12 @@ Subresources:
 - `DELETE /candidate/languages/:id`
 - `PUT /candidate/skills`
 - `PUT /candidate/preferred-roles`
-- `POST /candidate/cv/upload-intent`
+- `GET /candidate/cv`
+- `PUT /candidate/cv/content`
+- `GET /candidate/cv/content`
 - `DELETE /candidate/cv`
+
+CV upload accepts a raw `application/pdf` body, an encoded `x-file-name` header and a bounded `Content-Length` up to 10 MB. The server verifies the PDF signature. Candidate DTOs expose only the original filename; raw storage keys are never returned.
 
 ## Candidate video
 - `POST /candidate/video/upload-intent`
@@ -73,10 +77,13 @@ Member actions are tenant-scoped and role-restricted.
 ## Recruiter candidate search
 - `GET /search/candidates`
 - `GET /search/candidates/:candidateId`
+- `GET /search/candidates/:candidateId/cv`
 
 Query filters may include category, subcategory, preferredRole, skills, minExperienceYears, certificate, country, city, language, availability and cursor/page-size parameters.
 
 Candidate search DTO must expose only recruiter-authorized professional fields. No private account/security data.
+
+Recruiter CV download requires an authenticated company role, company tenant membership and a discoverable candidate profile. It streams the private PDF as an attachment and never returns a storage URL or object key.
 
 ## Candidate view event
 - `POST /search/candidates/:candidateId/view`

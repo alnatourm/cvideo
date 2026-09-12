@@ -100,6 +100,7 @@ export interface CandidateSearchItem {
 
 export interface CandidateDetail extends CandidateSearchItem {
   professionalSummary: string | null;
+  cvOriginalFilename: string | null;
   preferredRoleIds: string[];
   skillIds: string[];
   languageIds: string[];
@@ -291,6 +292,27 @@ export const api = {
   },
   syncCandidateVideo: () => request<CandidateVideo>('/api/v1/candidate/video/sync', { method: 'POST' }),
   deleteCandidateVideo: () => request<void>('/api/v1/candidate/video', { method: 'DELETE' }),
+  async uploadCandidateCv(uri: string, filename: string, sizeBytes: number) {
+    const token = await getSessionToken();
+    if (!token) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    const response = await expoFetch(`${apiBase()}/api/v1/candidate/cv/content`, {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/pdf',
+        'content-length': String(sizeBytes),
+        'x-file-name': encodeURIComponent(filename),
+      },
+      body: new File(uri),
+    });
+    const payload = (await response.json().catch(() => ({}))) as { data?: { filename: string }; error?: { code?: string; message?: string } };
+    if (!response.ok || !payload.data) {
+      if (response.status === 401) await clearSessionToken().catch(() => undefined);
+      throw new ApiError(response.status, payload.error?.code ?? 'UPLOAD_FAILED', payload.error?.message ?? 'CV upload failed');
+    }
+    return payload.data;
+  },
+  deleteCandidateCv: () => request<void>('/api/v1/candidate/cv', { method: 'DELETE' }),
   candidateInterviews: () => request<Interview[]>('/api/v1/interviews'),
   acceptInterview: (id: string) => request<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/accept`, { method: 'POST' }),
   declineInterview: (id: string, message?: string) => request<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/decline`, { method: 'POST', body: json({ message }) }),

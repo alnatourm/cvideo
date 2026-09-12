@@ -22,6 +22,7 @@ export interface RecruiterCandidateCard {
 
 export interface RecruiterCandidateDetail extends RecruiterCandidateCard {
   professionalSummary: string | null;
+  cvOriginalFilename: string | null;
   preferredRoleIds: string[];
   skillIds: string[];
   languageIds: string[];

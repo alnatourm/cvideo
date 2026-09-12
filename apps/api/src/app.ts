@@ -8,6 +8,9 @@ import type { AuthService } from './auth/service.js';
 import { CandidateError } from './candidate/errors.js';
 import { createCandidateRouter } from './candidate/routes.js';
 import type { CandidateService } from './candidate/service.js';
+import { CvError } from './cv/errors.js';
+import { createCandidateCvRouter, createRecruiterCvRouter } from './cv/routes.js';
+import type { CvService } from './cv/service.js';
 import { DiscoveryError } from './discovery/errors.js';
 import { createCandidateDiscoveryRouter, createRecruiterDiscoveryRouter } from './discovery/routes.js';
 import type { DiscoveryService } from './discovery/service.js';
@@ -29,6 +32,7 @@ import type { TaxonomyService } from './taxonomy/service.js';
 export interface AppOptions {
   authService?: AuthService;
   candidateService?: CandidateService;
+  cvService?: CvService;
   discoveryService?: DiscoveryService;
   interviewsService?: InterviewsService;
   mediaService?: MediaService;
@@ -55,6 +59,10 @@ export function createApp(options: AppOptions = {}) {
   if (options.authService && options.candidateService) {
     app.use('/api/v1/candidate', createCandidateRouter(options.authService, options.candidateService));
   }
+  if (options.authService && options.cvService) {
+    app.use('/api/v1/candidate', createCandidateCvRouter(options.authService, options.cvService));
+    app.use('/api/v1/search/candidates', createRecruiterCvRouter(options.authService, options.cvService));
+  }
   if (options.authService && options.discoveryService) {
     app.use('/api/v1/candidate', createCandidateDiscoveryRouter(options.authService, options.discoveryService));
     app.use('/api/v1/search/candidates', createRecruiterDiscoveryRouter(options.authService, options.discoveryService));
@@ -80,6 +88,7 @@ export function createApp(options: AppOptions = {}) {
     if (
       error instanceof AuthError ||
       error instanceof CandidateError ||
+      error instanceof CvError ||
       error instanceof DiscoveryError ||
       error instanceof InterviewsError ||
       error instanceof MediaError ||

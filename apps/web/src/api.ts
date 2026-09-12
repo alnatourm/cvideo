@@ -66,6 +66,7 @@ export interface CandidateSearchPage {
 
 export interface CandidateDetail extends CandidateSearchItem {
   professionalSummary: string | null;
+  cvOriginalFilename: string | null;
   preferredRoleIds: string[];
   skillIds: string[];
   languageIds: string[];
@@ -173,6 +174,15 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return payload.data as T;
 }
 
+async function apiDownload(path: string) {
+  const response = await fetch(`${API_BASE}${path}`, { credentials: 'include' });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: { code?: string; message?: string } };
+    throw new ApiError(response.status, payload.error?.code ?? 'DOWNLOAD_FAILED', payload.error?.message ?? 'Download failed');
+  }
+  return response.blob();
+}
+
 function jsonBody(value: unknown) {
   return JSON.stringify(value);
 }
@@ -214,9 +224,17 @@ export const api = {
   }),
   syncCandidateVideo: () => apiRequest<CandidateVideo>('/api/v1/candidate/video/sync', { method: 'POST' }),
   deleteCandidateVideo: () => apiRequest<void>('/api/v1/candidate/video', { method: 'DELETE' }),
+  uploadCandidateCv: (file: File) => apiRequest<{ filename: string }>('/api/v1/candidate/cv/content', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/pdf', 'x-file-name': encodeURIComponent(file.name) },
+    body: file,
+  }),
+  deleteCandidateCv: () => apiRequest<void>('/api/v1/candidate/cv', { method: 'DELETE' }),
+  downloadOwnCv: () => apiDownload('/api/v1/candidate/cv/content'),
 
   searchCandidates: (params: URLSearchParams) => apiRequest<CandidateSearchPage>(`/api/v1/search/candidates?${params.toString()}`),
   getCandidateDetail: (candidateId: string) => apiRequest<CandidateDetail>(`/api/v1/search/candidates/${encodeURIComponent(candidateId)}`),
+  downloadCandidateCv: (candidateId: string) => apiDownload(`/api/v1/search/candidates/${encodeURIComponent(candidateId)}/cv`),
 
   listSavedLists: () => apiRequest<SavedList[]>('/api/v1/saved-lists'),
   createSavedList: (name: string, description?: string) => apiRequest<SavedList>('/api/v1/saved-lists', { method: 'POST', body: jsonBody({ name, description }) }),

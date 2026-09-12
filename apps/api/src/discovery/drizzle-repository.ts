@@ -146,6 +146,7 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
         primaryCategoryId: candidateProfiles.primaryCategoryId,
         primarySubcategoryId: candidateProfiles.primarySubcategoryId,
         professionalSummary: candidateProfiles.professionalSummary,
+        cvOriginalFilename: candidateProfiles.cvOriginalFilename,
         introductionVideoId: candidateVideos.id,
         introductionVideoUrl: candidateVideos.playbackKey,
         introductionVideoThumbnailUrl: candidateVideos.thumbnailKey,

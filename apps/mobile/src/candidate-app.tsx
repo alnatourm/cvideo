@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   api,
   ApiError,
@@ -261,6 +262,42 @@ export function CandidateApp({
     void api.completeness().then((value) => setCompleteness(value.percent)).catch(() => undefined);
   }
 
+  async function chooseCv() {
+    setError(''); setNotice('');
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true, multiple: false });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      if (!asset.size || asset.size > 10 * 1024 * 1024 || (asset.mimeType && asset.mimeType !== 'application/pdf')) {
+        throw new Error(tx(locale, 'Choose a PDF no larger than 10 MB.', 'اختر ملف PDF لا يزيد عن 10 ميجابايت.'));
+      }
+      setBusy('cv');
+      const uploaded = await api.uploadCandidateCv(asset.uri, asset.name, asset.size);
+      setProfile((current) => current ? { ...current, cvOriginalFilename: uploaded.filename } : current);
+      setNotice(tx(locale, 'Optional CV uploaded securely.', 'تم رفع السيرة الذاتية الاختيارية بأمان.'));
+    } catch (err) { setError(errorMessage(locale, err)); } finally { setBusy(''); }
+  }
+
+  function confirmDeleteCv() {
+    Alert.alert(
+      tx(locale, 'Delete uploaded CV?', 'حذف السيرة الذاتية المرفوعة؟'),
+      tx(locale, 'The PDF will no longer be available to company users.', 'لن يعود ملف PDF متاحًا لمستخدمي الشركات.'),
+      [
+        { text: tx(locale, 'Cancel', 'إلغاء'), style: 'cancel' },
+        { text: tx(locale, 'Delete', 'حذف'), style: 'destructive', onPress: () => { void deleteCv(); } },
+      ],
+    );
+  }
+
+  async function deleteCv() {
+    setBusy('cv'); setError(''); setNotice('');
+    try {
+      await api.deleteCandidateCv();
+      setProfile((current) => current ? { ...current, cvOriginalFilename: null } : current);
+      setNotice(tx(locale, 'CV deleted.', 'تم حذف السيرة الذاتية.'));
+    } catch (err) { setError(errorMessage(locale, err)); } finally { setBusy(''); }
+  }
+
   const logoutButton = <Pressable style={styles.logout} onPress={onLogout}><Text style={styles.logoutText}>{tx(locale, 'Logout', 'خروج')}</Text></Pressable>;
 
   return (
@@ -336,6 +373,7 @@ export function CandidateApp({
                 <PrimaryButton label={busy === 'profile' ? tx(locale, 'Saving…', 'جاري الحفظ…') : tx(locale, 'Save profile', 'حفظ الملف')} onPress={() => void saveProfile()} disabled={busy === 'profile'} />
               </Card>
             )}
+            {profile ? <Card><Text style={[styles.eyebrow, rtl && styles.rtl]}>{tx(locale, 'OPTIONAL CV', 'السيرة الذاتية الاختيارية')}</Text><Text style={[styles.cardTitle, rtl && styles.rtl]}>{profile.cvOriginalFilename ?? tx(locale, 'No CV uploaded', 'لم يتم رفع سيرة ذاتية')}</Text><Text style={[styles.body, rtl && styles.rtl]}>{tx(locale, 'PDF only, up to 10 MB. It stays private and is served only through authorized CVIDEO access.', 'ملف PDF فقط، حتى 10 ميجابايت. يبقى خاصًا ولا يُعرض إلا عبر وصول CVIDEO المصرح.')}</Text><PrimaryButton label={busy === 'cv' ? tx(locale, 'Working…', 'جاري التنفيذ…') : tx(locale, profile.cvOriginalFilename ? 'Replace PDF' : 'Choose PDF', profile.cvOriginalFilename ? 'استبدال PDF' : 'اختر PDF')} onPress={() => void chooseCv()} disabled={busy === 'cv'} />{profile.cvOriginalFilename ? <Pressable style={styles.deleteVideo} onPress={confirmDeleteCv} disabled={busy === 'cv'}><Text style={styles.deleteVideoText}>{tx(locale, 'Delete CV', 'حذف السيرة الذاتية')}</Text></Pressable> : null}</Card> : null}
             {profile ? <ProfileEvidenceEditor locale={locale} initialExperience={profile.experience} initialEducation={profile.education} initialCertificates={profile.certificates} onChanged={evidenceChanged} onError={setError} onNotice={setNotice} /> : null}
           </>
         ) : null}
