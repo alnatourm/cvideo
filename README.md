@@ -2,6 +2,8 @@
 
 CVIDEO is OGroup's video-first reverse-employment platform.
 
+Deployment operators: see [`docs/RAILWAY_STAGING.md`](docs/RAILWAY_STAGING.md) for the staging topology and [`docs/RELEASE_READINESS.md`](docs/RELEASE_READINESS.md) for the production approval gate.
+
 > **Core principle:** Companies search people instead of people searching vacancies.
 
 Candidates build reusable professional profiles centered on a short introduction video. Companies search the talent pool directly, watch candidate videos, save candidates, start conversations, and request interviews. Candidates do **not** browse vacancies or apply to jobs.

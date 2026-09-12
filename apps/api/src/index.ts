@@ -1,4 +1,6 @@
 import { createApp } from './app.js';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { DrizzleCompanyVerificationRepository } from './admin/drizzle-repository.js';
 import { CompanyVerificationService } from './admin/service.js';
 import { DrizzleAuthRepository } from './auth/drizzle-repository.js';
@@ -53,6 +55,8 @@ const mediaService = new MediaService(new DrizzleMediaRepository(db), videoProvi
 const messagingService = new MessagingService(new DrizzleMessagingRepository(db));
 const savedListsService = new SavedListsService(new DrizzleSavedListsRepository(db));
 const taxonomyService = new TaxonomyService(new DrizzleTaxonomyRepository(db));
+const webDistDirectory = fileURLToPath(new URL('../../web/dist/', import.meta.url));
+const serveWeb = existsSync(fileURLToPath(new URL('index.html', new URL('../../web/dist/', import.meta.url))));
 const app = createApp({
   authService,
   companyVerificationService,
@@ -65,6 +69,7 @@ const app = createApp({
   messagingService,
   savedListsService,
   taxonomyService,
+  webDistDirectory: serveWeb ? webDistDirectory : undefined,
 });
 
 const server = app.listen(port, () => {
