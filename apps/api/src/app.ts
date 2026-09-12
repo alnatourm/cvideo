@@ -2,6 +2,9 @@ import cookieParser from 'cookie-parser';
 import express, { type ErrorRequestHandler } from 'express';
 import helmet from 'helmet';
 import { ZodError } from 'zod';
+import { AdminError } from './admin/errors.js';
+import { createAdminRouter, createCompanyVerificationRouter } from './admin/routes.js';
+import type { CompanyVerificationService } from './admin/service.js';
 import { AuthError } from './auth/errors.js';
 import { createAuthRouter } from './auth/routes.js';
 import type { AuthService } from './auth/service.js';
@@ -30,6 +33,7 @@ import { createTaxonomyRouter } from './taxonomy/routes.js';
 import type { TaxonomyService } from './taxonomy/service.js';
 
 export interface AppOptions {
+  companyVerificationService?: CompanyVerificationService;
   authService?: AuthService;
   candidateService?: CandidateService;
   cvService?: CvService;
@@ -56,6 +60,10 @@ export function createApp(options: AppOptions = {}) {
 
   if (options.taxonomyService) app.use('/api/v1/taxonomy', createTaxonomyRouter(options.taxonomyService));
   if (options.authService) app.use('/api/v1/auth', createAuthRouter(options.authService, { secureCookies: options.secureCookies }));
+  if (options.authService && options.companyVerificationService) {
+    app.use('/api/v1/admin', createAdminRouter(options.authService, options.companyVerificationService));
+    app.use('/api/v1/companies', createCompanyVerificationRouter(options.authService, options.companyVerificationService));
+  }
   if (options.authService && options.candidateService) {
     app.use('/api/v1/candidate', createCandidateRouter(options.authService, options.candidateService));
   }
@@ -86,6 +94,7 @@ export function createApp(options: AppOptions = {}) {
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     if (
+      error instanceof AdminError ||
       error instanceof AuthError ||
       error instanceof CandidateError ||
       error instanceof CvError ||

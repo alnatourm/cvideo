@@ -165,6 +165,20 @@ export interface TaxonomyItem {
   nameAr: string;
 }
 
+export interface CompanyVerificationStatus {
+  id: string;
+  companyId: string;
+  companyName: string;
+  countryCode: string;
+  city: string;
+  commercialRegistrationNumber: string;
+  verificationStatus: 'pending' | 'verified' | 'rejected';
+  operationalStatus: 'active' | 'suspended';
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+}
+
 const TOKEN_KEY = 'cvideo_mobile_session';
 let cachedToken: string | null | undefined;
 
@@ -253,6 +267,7 @@ export const api = {
     request<unknown>('/api/v1/auth/register/candidate', { method: 'POST', body: json(input) }, false),
   registerCompany: (input: { email: string; password: string; companyName: string; countryCode: string; city: string; commercialRegistrationNumber: string }) =>
     request<unknown>('/api/v1/auth/register/company', { method: 'POST', body: json(input) }, false),
+  companyVerification: () => request<CompanyVerificationStatus>('/api/v1/companies/me/verification'),
 
   candidateProfile: () => request<CandidateProfile>('/api/v1/candidate/profile'),
   updateCandidateProfile: (input: unknown) => request<CandidateProfile>('/api/v1/candidate/profile', { method: 'PUT', body: json(input) }),

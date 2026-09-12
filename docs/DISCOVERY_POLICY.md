@@ -23,7 +23,7 @@ Only authenticated company-side roles may use recruiter discovery:
 Candidate accounts cannot access recruiter discovery. Discovery is not a public candidate feed.
 
 ## Company verification
-Company-verification gating for search/contact remains deferred. This slice does not claim that every searching company has been verified. A later Product/Factory decision may enable a verification requirement before search, chat, or interview actions.
+Company-verification gating for search/contact remains deferred. Manual pending/verified/rejected review and active/suspended company enforcement are implemented, but pending or rejected status alone does not yet block search/contact. A later Product/Factory decision may enable that requirement; the UI must not claim that every searching company has been verified.
 
 ## Safe recruiter read model
 Recruiter search/detail responses may expose approved professional profile information only. They must not expose:

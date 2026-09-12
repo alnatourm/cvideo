@@ -23,6 +23,8 @@ import {
   type CandidateProfile,
   type CandidateSearchItem,
   type CandidateVideo,
+  type CompanyVerification,
+  type CompanyVerificationStatusView,
   type ChatMessage,
   type EffectiveRole,
   type Interview,
@@ -774,12 +776,65 @@ function MessagesPage({ locale, setLocale }: { locale: Locale; setLocale: (local
 function CompanyAccount({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
   const { principal } = useAuth();
   const [interviews, setInterviews] = useState<Interview[]>([]);
-  useEffect(() => { void api.listInterviews().then(setInterviews).catch(() => undefined); }, []);
-  return <AppShell locale={locale} setLocale={setLocale}><PageHead eyebrow={text(locale, 'Company Account', 'حساب الشركة')} title={text(locale, 'Company workspace', 'مساحة الشركة')} description={text(locale, 'Your account, role and interview activity.', 'حسابك ودورك ونشاط المقابلات.')}/><div className="metric-grid"><Metric label={text(locale, 'Role', 'الدور')} value={principal?.effectiveRole.replaceAll('_', ' ') ?? ''}/><Metric label={text(locale, 'Company ID', 'معرف الشركة')} value={principal?.companyId?.slice(0, 8) ?? '—'}/><Metric label={text(locale, 'Interview requests', 'طلبات المقابلة')} value={String(interviews.length)}/></div><section className="panel"><h2>{text(locale, 'Recent interview activity', 'نشاط المقابلات الأخير')}</h2>{interviews.length === 0 ? <div className="empty-state">{text(locale, 'No interviews requested yet.', 'لا توجد مقابلات بعد.')}</div> : interviews.slice(0, 8).map((item) => <article className="interview-row" key={item.id}><div><span className={`status ${item.status}`}>{item.status}</span><h3>{item.opportunityTitle}</h3><p>{new Date(item.startsAtUtc).toLocaleString()}</p></div></article>)}</section></AppShell>;
+  const [verification, setVerification] = useState<CompanyVerificationStatusView | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    void Promise.all([api.listInterviews(), api.getCompanyVerification()])
+      .then(([items, status]) => { setInterviews(items); setVerification(status); })
+      .catch((err) => setError(errorMessage(err)));
+  }, []);
+  return <AppShell locale={locale} setLocale={setLocale}>
+    <PageHead eyebrow={text(locale, 'Company Account', 'حساب الشركة')} title={verification?.companyName ?? text(locale, 'Company workspace', 'مساحة الشركة')} description={text(locale, 'Your account, verification state and interview activity.', 'حسابك وحالة التحقق ونشاط المقابلات.')}/>
+    {error && <div className="notice error">{error}</div>}
+    <div className="metric-grid"><Metric label={text(locale, 'Role', 'الدور')} value={principal?.effectiveRole.replaceAll('_', ' ') ?? ''}/><Metric label={text(locale, 'Verification', 'التحقق')} value={verification?.verificationStatus.toUpperCase() ?? '—'}/><Metric label={text(locale, 'Account status', 'حالة الحساب')} value={verification?.operationalStatus.toUpperCase() ?? '—'}/><Metric label={text(locale, 'Interview requests', 'طلبات المقابلة')} value={String(interviews.length)}/></div>
+    {verification && <section className="panel"><span className="eyebrow">{text(locale, 'Company verification', 'التحقق من الشركة')}</span><h2>{verification.countryCode} · {verification.commercialRegistrationNumber}</h2><p className="muted">{verification.verificationStatus === 'pending' ? text(locale, 'Your registration is awaiting manual CVIDEO review.', 'سجل شركتك بانتظار مراجعة يدوية من CVIDEO.') : verification.verificationStatus === 'verified' ? text(locale, 'Your company registration has been verified.', 'تم التحقق من سجل شركتك.') : text(locale, `Verification rejected: ${verification.rejectionReason ?? 'Contact support for details.'}`, `تم رفض التحقق: ${verification.rejectionReason ?? 'تواصل مع الدعم للتفاصيل.'}`)}</p></section>}
+    <section className="panel"><h2>{text(locale, 'Recent interview activity', 'نشاط المقابلات الأخير')}</h2>{interviews.length === 0 ? <div className="empty-state">{text(locale, 'No interviews requested yet.', 'لا توجد مقابلات بعد.')}</div> : interviews.slice(0, 8).map((item) => <article className="interview-row" key={item.id}><div><span className={`status ${item.status}`}>{item.status}</span><h3>{item.opportunityTitle}</h3><p>{new Date(item.startsAtUtc).toLocaleString()}</p></div></article>)}</section>
+  </AppShell>;
 }
 
 function AdminPage({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
-  return <AppShell locale={locale} setLocale={setLocale}><PageHead eyebrow={text(locale, 'Protected administration', 'الإدارة المحمية')} title={text(locale, 'CVIDEO Admin', 'إدارة CVIDEO')} description={text(locale, 'Administrative workflows are the next governed product slice.', 'سير عمل الإدارة هو المرحلة التالية الخاضعة للحوكمة.')}/><section className="panel"><div className="empty-state tall">{text(locale, 'Admin data actions are intentionally not fabricated. This route is protected and ready for the dedicated Admin build.', 'لم تتم إضافة إجراءات إدارية وهمية. المسار محمي وجاهز لبناء لوحة الإدارة المخصصة.')}</div></section></AppShell>;
+  const [items, setItems] = useState<CompanyVerification[]>([]);
+  const [filter, setFilter] = useState<CompanyVerification['verificationStatus'] | 'all'>('pending');
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  async function load(nextFilter = filter) {
+    setError('');
+    try { setItems(await api.listCompanyVerifications(nextFilter === 'all' ? undefined : nextFilter)); }
+    catch (err) { setError(errorMessage(err)); }
+  }
+  useEffect(() => { void load(); }, []);
+
+  async function decide(item: CompanyVerification, action: 'approve' | 'reject') {
+    const reason = action === 'reject' ? window.prompt(text(locale, 'Enter the rejection reason:', 'أدخل سبب الرفض:')) : null;
+    if (action === 'reject' && !reason?.trim()) return;
+    const note = window.prompt(text(locale, 'Optional internal review note:', 'ملاحظة مراجعة داخلية اختيارية:')) ?? undefined;
+    setBusy(item.id); setError(''); setNotice('');
+    try {
+      if (action === 'approve') await api.approveCompanyVerification(item.id, note?.trim() || undefined);
+      else await api.rejectCompanyVerification(item.id, reason!.trim(), note?.trim() || undefined);
+      setNotice(action === 'approve' ? text(locale, 'Company verified.', 'تم التحقق من الشركة.') : text(locale, 'Verification rejected.', 'تم رفض التحقق.'));
+      await load();
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  async function toggleCompany(item: CompanyVerification) {
+    const next = item.operationalStatus === 'active' ? 'suspended' : 'active';
+    if (!window.confirm(text(locale, `${next === 'suspended' ? 'Suspend' : 'Activate'} ${item.companyName}?`, `${next === 'suspended' ? 'تعليق' : 'تفعيل'} ${item.companyName}؟`))) return;
+    setBusy(item.companyId); setError('');
+    try { await api.setCompanyOperationalStatus(item.companyId, next); await load(); }
+    catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  return <AppShell locale={locale} setLocale={setLocale}>
+    <PageHead eyebrow={text(locale, 'Protected administration', 'الإدارة المحمية')} title={text(locale, 'Company verification', 'التحقق من الشركات')} description={text(locale, 'Manual registry review with explicit decisions and audit events.', 'مراجعة يدوية للسجل مع قرارات واضحة وسجل تدقيق.')}/>
+    {error && <div className="notice error">{error}</div>}{notice && <div className="notice success">{notice}</div>}
+    <section className="panel">
+      <div className="panel-head"><div><span className="eyebrow">{text(locale, 'Verification queue', 'قائمة التحقق')}</span><h2>{items.length} {text(locale, 'records', 'سجلات')}</h2></div><select value={filter} onChange={(e) => { const value = e.target.value as typeof filter; setFilter(value); void load(value); }}><option value="pending">{text(locale, 'Pending', 'قيد الانتظار')}</option><option value="verified">{text(locale, 'Verified', 'تم التحقق')}</option><option value="rejected">{text(locale, 'Rejected', 'مرفوض')}</option><option value="all">{text(locale, 'All', 'الكل')}</option></select></div>
+      {items.length === 0 ? <div className="empty-state tall">{text(locale, 'No verification records in this view.', 'لا توجد سجلات تحقق في هذا العرض.')}</div> : items.map((item) => <article className="interview-row" key={item.id}><div><span className={`status ${item.verificationStatus}`}>{item.verificationStatus}</span><h3>{item.companyName}</h3><p>{item.city}, {item.countryCode} · {text(locale, 'CR', 'السجل')}: {item.commercialRegistrationNumber}</p><small>{item.submittedByEmail} · {new Date(item.createdAt).toLocaleString()}</small>{item.rejectionReason && <p className="notice error">{item.rejectionReason}</p>}</div><div className="actions compact-actions">{item.verificationStatus === 'pending' && <><button className="button primary small" disabled={busy === item.id} onClick={() => void decide(item, 'approve')}>{text(locale, 'Approve', 'موافقة')}</button><button className="button secondary small" disabled={busy === item.id} onClick={() => void decide(item, 'reject')}>{text(locale, 'Reject', 'رفض')}</button></>}<button className="ghost small" disabled={busy === item.companyId} onClick={() => void toggleCompany(item)}>{item.operationalStatus === 'active' ? text(locale, 'Suspend company', 'تعليق الشركة') : text(locale, 'Activate company', 'تفعيل الشركة')}</button></div></article>)}
+    </section>
+  </AppShell>;
 }
 
 export function App() {

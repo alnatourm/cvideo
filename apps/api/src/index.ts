@@ -1,4 +1,6 @@
 import { createApp } from './app.js';
+import { DrizzleCompanyVerificationRepository } from './admin/drizzle-repository.js';
+import { CompanyVerificationService } from './admin/service.js';
 import { DrizzleAuthRepository } from './auth/drizzle-repository.js';
 import { AuthService } from './auth/service.js';
 import { DrizzleCandidateRepository } from './candidate/drizzle-repository.js';
@@ -26,6 +28,7 @@ const port = Number(process.env.PORT ?? 4000);
 const databaseUrl = process.env.DATABASE_URL ?? '';
 const { db, client } = createDatabase(databaseUrl);
 const authService = new AuthService(new DrizzleAuthRepository(db));
+const companyVerificationService = new CompanyVerificationService(new DrizzleCompanyVerificationRepository(db));
 const candidateService = new CandidateService(new DrizzleCandidateRepository(db));
 const cvStorageDirectory = process.env.CV_DOCUMENT_STORAGE_DIR?.trim();
 const documentProvider = cvStorageDirectory
@@ -49,6 +52,7 @@ const savedListsService = new SavedListsService(new DrizzleSavedListsRepository(
 const taxonomyService = new TaxonomyService(new DrizzleTaxonomyRepository(db));
 const app = createApp({
   authService,
+  companyVerificationService,
   candidateService,
   cvService,
   discoveryService,

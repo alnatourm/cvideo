@@ -64,7 +64,8 @@ Server verifies type/size/duration and transitions state through pending/uploadi
 - `GET /companies/me`
 - `PUT /companies/me`
 - `GET /companies/me/verification`
-- `POST /companies/me/verification`
+
+The company verification response includes the manual review status (`pending`, `verified`, or `rejected`), operational status (`active` or `suspended`), registration number and any candidate-visible rejection reason. Verification does not claim automation.
 
 Members:
 - `GET /company/members`
@@ -164,11 +165,14 @@ Protected super-admin family:
 - `GET /admin/company-verifications`
 - `POST /admin/company-verifications/:id/approve`
 - `POST /admin/company-verifications/:id/reject`
+- `PUT /admin/companies/:companyId/status`
 - `GET /admin/videos`
 - `POST /admin/videos/:id/approve`
 - `POST /admin/videos/:id/reject`
 - CRUD `/admin/taxonomy/...`
 - `GET /admin/audit`
+
+Verification approve/reject and company active/suspended mutations are super-admin-only and create audit events. Rejection requires a reason. A pending verification may be decided only once. Company suspension invalidates active company-member authorization on the next authenticated request.
 
 ## Error codes
 Initial stable codes should include:

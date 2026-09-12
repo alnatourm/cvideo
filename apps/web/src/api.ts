@@ -131,6 +131,24 @@ export interface TaxonomyItem {
   nameAr: string;
 }
 
+export interface CompanyVerification {
+  id: string;
+  companyId: string;
+  companyName: string;
+  countryCode: string;
+  city: string;
+  commercialRegistrationNumber: string;
+  submittedByEmail: string;
+  verificationStatus: 'pending' | 'verified' | 'rejected';
+  operationalStatus: 'active' | 'suspended';
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+}
+
+export type CompanyVerificationStatusView = Omit<CompanyVerification, 'submittedByEmail' | 'reviewNote'>;
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? '';
 const CSRF_KEY = 'cvideo_csrf';
 
@@ -208,6 +226,11 @@ export const api = {
     apiRequest<unknown>('/api/v1/auth/register/candidate', { method: 'POST', body: jsonBody(input) }),
   registerCompany: (input: { email: string; password: string; companyName: string; countryCode: string; city: string; commercialRegistrationNumber: string }) =>
     apiRequest<unknown>('/api/v1/auth/register/company', { method: 'POST', body: jsonBody(input) }),
+  getCompanyVerification: () => apiRequest<CompanyVerificationStatusView>('/api/v1/companies/me/verification'),
+  listCompanyVerifications: (status?: CompanyVerification['verificationStatus']) => apiRequest<CompanyVerification[]>(`/api/v1/admin/company-verifications${status ? `?status=${status}` : ''}`),
+  approveCompanyVerification: (id: string, note?: string) => apiRequest<CompanyVerification>(`/api/v1/admin/company-verifications/${encodeURIComponent(id)}/approve`, { method: 'POST', body: jsonBody({ note }) }),
+  rejectCompanyVerification: (id: string, reason: string, note?: string) => apiRequest<CompanyVerification>(`/api/v1/admin/company-verifications/${encodeURIComponent(id)}/reject`, { method: 'POST', body: jsonBody({ reason, note }) }),
+  setCompanyOperationalStatus: (companyId: string, status: CompanyVerification['operationalStatus']) => apiRequest<CompanyVerification>(`/api/v1/admin/companies/${encodeURIComponent(companyId)}/status`, { method: 'PUT', body: jsonBody({ status }) }),
 
   getCandidateProfile: () => apiRequest<CandidateProfile>('/api/v1/candidate/profile'),
   updateCandidateProfile: (input: unknown) => apiRequest<CandidateProfile>('/api/v1/candidate/profile', { method: 'PUT', body: jsonBody(input) }),
