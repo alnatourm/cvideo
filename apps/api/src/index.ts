@@ -3,6 +3,9 @@ import { DrizzleAuthRepository } from './auth/drizzle-repository.js';
 import { AuthService } from './auth/service.js';
 import { DrizzleCandidateRepository } from './candidate/drizzle-repository.js';
 import { CandidateService } from './candidate/service.js';
+import { DrizzleCvRepository } from './cv/drizzle-repository.js';
+import { DeferredDocumentProvider, FilesystemDocumentProvider } from './cv/provider.js';
+import { CvService } from './cv/service.js';
 import { createDatabase } from './db/client.js';
 import { DrizzleDiscoveryRepository } from './discovery/drizzle-repository.js';
 import { DiscoveryService } from './discovery/service.js';
@@ -24,6 +27,11 @@ const databaseUrl = process.env.DATABASE_URL ?? '';
 const { db, client } = createDatabase(databaseUrl);
 const authService = new AuthService(new DrizzleAuthRepository(db));
 const candidateService = new CandidateService(new DrizzleCandidateRepository(db));
+const cvStorageDirectory = process.env.CV_DOCUMENT_STORAGE_DIR?.trim();
+const documentProvider = cvStorageDirectory
+  ? new FilesystemDocumentProvider(cvStorageDirectory)
+  : new DeferredDocumentProvider();
+const cvService = new CvService(new DrizzleCvRepository(db), documentProvider);
 const discoveryService = new DiscoveryService(new DrizzleDiscoveryRepository(db));
 const interviewsService = new InterviewsService(new DrizzleInterviewsRepository(db), new DeferredGoogleMeetProvider());
 
@@ -42,6 +50,7 @@ const taxonomyService = new TaxonomyService(new DrizzleTaxonomyRepository(db));
 const app = createApp({
   authService,
   candidateService,
+  cvService,
   discoveryService,
   interviewsService,
   mediaService,

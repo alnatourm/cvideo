@@ -53,6 +53,7 @@ class MemoryDiscoveryRepository implements DiscoveryRepository {
       introductionVideoUrl: 'https://video.example/playlist.m3u8',
       introductionVideoThumbnailUrl: 'https://video.example/thumb.jpg',
       professionalSummary: 'Professional summary',
+      cvOriginalFilename: 'resume.pdf',
       preferredRoleIds: [],
       skillIds: [],
       languageIds: [],

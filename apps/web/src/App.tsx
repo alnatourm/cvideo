@@ -509,6 +509,39 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
     catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
   }
 
+  async function uploadCv(file: File) {
+    setBusy('cv'); setError(''); setNotice('');
+    try {
+      if (file.type !== 'application/pdf' || file.size <= 0 || file.size > 10 * 1024 * 1024) {
+        throw new Error(text(locale, 'Choose a PDF no larger than 10 MB.', 'اختر ملف PDF لا يزيد عن 10 ميجابايت.'));
+      }
+      const result = await api.uploadCandidateCv(file);
+      setProfile((current) => current ? { ...current, cvOriginalFilename: result.filename } : current);
+      setNotice(text(locale, 'Optional CV uploaded securely.', 'تم رفع السيرة الذاتية الاختيارية بأمان.'));
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  async function deleteCv() {
+    if (!window.confirm(text(locale, 'Delete your uploaded CV?', 'حذف السيرة الذاتية المرفوعة؟'))) return;
+    setBusy('cv'); setError(''); setNotice('');
+    try {
+      await api.deleteCandidateCv();
+      setProfile((current) => current ? { ...current, cvOriginalFilename: null } : current);
+      setNotice(text(locale, 'CV deleted.', 'تم حذف السيرة الذاتية.'));
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  async function downloadCv() {
+    setBusy('cv'); setError('');
+    try {
+      const blob = await api.downloadOwnCv();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = profile?.cvOriginalFilename ?? 'cv.pdf'; link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
   if (!profile) return <AppShell locale={locale} setLocale={setLocale}><div className="loading-panel">{error || text(locale, 'Loading profile…', 'جاري تحميل الملف…')}</div></AppShell>;
 
   const label = (item: TaxonomyItem) => locale === 'ar' ? item.nameAr : item.nameEn;
@@ -539,6 +572,12 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
           <label className={`button secondary full file-button ${busy === 'video' ? 'disabled' : ''}`}>{text(locale, 'Choose 30s video', 'اختر فيديو 30 ثانية')}<input type="file" accept="video/mp4,video/webm,video/quicktime" disabled={busy === 'video'} onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadVideo(file); }} /></label>
           {video && ['processing', 'uploading'].includes(video.status) && <button className="button primary full" disabled={busy === 'video'} onClick={() => void syncVideo()} type="button">{text(locale, 'Check processing', 'فحص المعالجة')}</button>}
           <p className="tiny muted">{text(locale, 'CVIDEO delivery is capped at 720p. Your CV remains optional and secondary.', 'عرض CVIDEO محدود بدقة 720p. السيرة الذاتية اختيارية وثانوية.')}</p>
+          <hr />
+          <span className="eyebrow">{text(locale, 'Optional CV', 'السيرة الذاتية الاختيارية')}</span>
+          <h3>{profile.cvOriginalFilename ?? text(locale, 'No CV uploaded', 'لم يتم رفع سيرة ذاتية')}</h3>
+          <label className={`button secondary full file-button ${busy === 'cv' ? 'disabled' : ''}`}>{text(locale, profile.cvOriginalFilename ? 'Replace PDF' : 'Choose PDF', profile.cvOriginalFilename ? 'استبدال PDF' : 'اختر PDF')}<input type="file" accept="application/pdf,.pdf" disabled={busy === 'cv'} onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadCv(file); e.currentTarget.value = ''; }} /></label>
+          {profile.cvOriginalFilename && <><button className="button secondary full" disabled={busy === 'cv'} onClick={() => void downloadCv()} type="button">{text(locale, 'Download my CV', 'تنزيل سيرتي الذاتية')}</button><button className="ghost full" disabled={busy === 'cv'} onClick={() => void deleteCv()} type="button">{text(locale, 'Delete CV', 'حذف السيرة الذاتية')}</button></>}
+          <p className="tiny muted">{text(locale, 'PDF only, up to 10 MB. Stored privately and available only through authorized CVIDEO access.', 'ملف PDF فقط، حتى 10 ميجابايت. يُخزن بشكل خاص ولا يتاح إلا عبر وصول CVIDEO المصرح.')}</p>
         </aside>
       </div>
     </AppShell>
@@ -587,6 +626,18 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
     if (!selected) return; setBusy('chat'); setError('');
     try { const conversation = await api.createConversation(selected.id); navigate(`/recruiter/messages?conversation=${encodeURIComponent(conversation.id)}`); }
     catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  async function downloadCandidateCv() {
+    if (!selected?.cvOriginalFilename) return;
+    setBusy('cv'); setError('');
+    try {
+      const blob = await api.downloadCandidateCv(selected.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = selected.cvOriginalFilename; link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
   }
 
   async function saveCandidate() {
@@ -649,6 +700,7 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
             <div className="action-stack">
               <div className="inline-save"><select value={listId} onChange={(e) => setListId(e.target.value)}><option value="">{text(locale, 'Auto-create list', 'إنشاء قائمة تلقائياً')}</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><button className="button secondary" disabled={busy === 'save'} onClick={() => void saveCandidate()}>{text(locale, 'Save', 'حفظ')}</button></div>
               <button className="button secondary full" disabled={busy === 'chat'} onClick={() => void startChat()}>{text(locale, 'Start Chat', 'بدء محادثة')}</button>
+              {selected.cvOriginalFilename && <button className="button secondary full" disabled={busy === 'cv'} onClick={() => void downloadCandidateCv()}>{text(locale, 'Download CV', 'تنزيل السيرة الذاتية')}</button>}
               <button className="button primary full" onClick={() => { setInterviewForm((current) => ({ ...current, opportunityTitle: selected.headline || '' })); setShowInterview(true); }}>{t(locale, 'requestInterview')}</button>
             </div>
             <details className="evidence-details"><summary>{text(locale, 'Open full professional evidence', 'عرض التفاصيل المهنية الكاملة')}</summary><div><h4>{text(locale, 'Experience', 'الخبرة')}</h4>{selected.experience.map((item, index) => <p key={index}>{String(item.jobTitle ?? '')} · {String(item.companyName ?? '')}</p>)}<h4>{text(locale, 'Education', 'التعليم')}</h4>{selected.education.map((item, index) => <p key={index}>{String(item.qualification ?? '')} · {String(item.institution ?? '')}</p>)}<h4>{text(locale, 'Certificates', 'الشهادات')}</h4>{selected.certificates.map((item, index) => <p key={index}>{String(item.name ?? '')}</p>)}</div></details>
