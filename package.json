@@ -9,7 +9,8 @@
     "dev:mobile": "pnpm --filter @cvideo/mobile start",
     "build": "pnpm -r --if-present run build",
     "typecheck": "pnpm -r --if-present run typecheck",
-    "test": "pnpm -r --if-present run test"
+    "test": "pnpm -r --if-present run test",
+    "smoke:release": "node scripts/release-smoke.mjs"
   },
   "engines": {
     "node": ">=22.13"
