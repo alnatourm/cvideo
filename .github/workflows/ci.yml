@@ -80,3 +80,11 @@ jobs:
           psql "$DATABASE_URL" -Atc "select count(*) from pg_indexes where indexname = 'conversations_company_candidate_unique' and indexdef ilike 'CREATE UNIQUE INDEX%';" | grep -qx 1
           psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conrelid = 'public.interviews'::regclass and contype in ('c','f');" | grep -qE '^[4-9][0-9]*$'
           psql "$DATABASE_URL" -Atc "select count(*) from information_schema.columns where table_name = 'companies' and column_name = 'operational_status';" | grep -qx 1
+      - name: Smoke test compiled API
+        env:
+          CVIDEO_SMOKE_API_ORIGIN: http://127.0.0.1:4000
+          NODE_ENV: production
+          PORT: 4000
+        run: |
+          pnpm --filter @cvideo/api start > /tmp/cvideo-api.log 2>&1 &
+          pnpm smoke:release

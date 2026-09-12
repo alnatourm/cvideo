@@ -284,6 +284,8 @@ Continue in this order unless a verified blocker requires changing sequence:
    - smoke tests
    - final Product Owner release gate
 
+Release operators must use [`docs/RELEASE_READINESS.md`](docs/RELEASE_READINESS.md). Current user-facing changes and limitations are recorded in [`docs/RELEASE_NOTES_V1_DRAFT.md`](docs/RELEASE_NOTES_V1_DRAFT.md). These documents do not constitute release approval.
+
 ---
 
 ## External Production Configuration Still Required
