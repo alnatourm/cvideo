@@ -6,7 +6,18 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow CVIDEO to select your 30-second Introduction Video.",
+          "cameraPermission": "Allow CVIDEO to record your 30-second Introduction Video.",
+          "microphonePermission": "Allow CVIDEO to record audio with your Introduction Video."
+        }
+      ]
+    ],
     "experiments": { "typedRoutes": true },
     "ios": { "supportsTablet": true },
     "android": { "adaptiveIcon": { "backgroundColor": "#0B132B" } }

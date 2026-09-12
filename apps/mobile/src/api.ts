@@ -1,4 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
+import { File } from 'expo-file-system';
+import { fetch as expoFetch } from 'expo/fetch';
 
 export type EffectiveRole = 'super_admin' | 'company_owner' | 'company_admin' | 'recruiter' | 'candidate';
 export type Locale = 'en' | 'ar';
@@ -222,6 +224,29 @@ export const api = {
   visibility: () => request<{ discoverable: boolean }>('/api/v1/candidate/visibility'),
   setVisibility: (discoverable: boolean) => request<{ discoverable: boolean }>('/api/v1/candidate/visibility', { method: 'PUT', body: json({ discoverable }) }),
   candidateVideo: () => request<CandidateVideo | null>('/api/v1/candidate/video'),
+  startCandidateVideo: (input: { filename: string; mimeType: string; sizeBytes: number; durationSeconds: number; height: number }) =>
+    request<CandidateVideo & { uploadPath: string; maxBytes: number }>('/api/v1/candidate/video/start', { method: 'POST', body: json(input) }),
+  async uploadCandidateVideo(uri: string, mimeType: string, sizeBytes: number) {
+    const token = await getSessionToken();
+    if (!token) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    const response = await expoFetch(`${apiBase()}/api/v1/candidate/video/content`, {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': mimeType,
+        'content-length': String(sizeBytes),
+      },
+      body: new File(uri),
+    });
+    const payload = (await response.json().catch(() => ({}))) as { data?: CandidateVideo; error?: { code?: string; message?: string } };
+    if (!response.ok || !payload.data) {
+      if (response.status === 401) await clearSessionToken().catch(() => undefined);
+      throw new ApiError(response.status, payload.error?.code ?? 'UPLOAD_FAILED', payload.error?.message ?? 'Video upload failed');
+    }
+    return payload.data;
+  },
+  syncCandidateVideo: () => request<CandidateVideo>('/api/v1/candidate/video/sync', { method: 'POST' }),
+  deleteCandidateVideo: () => request<void>('/api/v1/candidate/video', { method: 'DELETE' }),
   candidateInterviews: () => request<Interview[]>('/api/v1/interviews'),
   acceptInterview: (id: string) => request<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/accept`, { method: 'POST' }),
   declineInterview: (id: string, message?: string) => request<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/decline`, { method: 'POST', body: json({ message }) }),
