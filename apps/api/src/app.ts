@@ -11,6 +11,9 @@ import type { AuthService } from './auth/service.js';
 import { CandidateError } from './candidate/errors.js';
 import { createCandidateRouter } from './candidate/routes.js';
 import type { CandidateService } from './candidate/service.js';
+import { CompanyError } from './company/errors.js';
+import { createCompanyMembersRouter, createCompanyProfileRouter } from './company/routes.js';
+import type { CompanyService } from './company/service.js';
 import { CvError } from './cv/errors.js';
 import { createCandidateCvRouter, createRecruiterCvRouter } from './cv/routes.js';
 import type { CvService } from './cv/service.js';
@@ -34,6 +37,7 @@ import type { TaxonomyService } from './taxonomy/service.js';
 
 export interface AppOptions {
   companyVerificationService?: CompanyVerificationService;
+  companyService?: CompanyService;
   authService?: AuthService;
   candidateService?: CandidateService;
   cvService?: CvService;
@@ -63,6 +67,10 @@ export function createApp(options: AppOptions = {}) {
   if (options.authService && options.companyVerificationService) {
     app.use('/api/v1/admin', createAdminRouter(options.authService, options.companyVerificationService));
     app.use('/api/v1/companies', createCompanyVerificationRouter(options.authService, options.companyVerificationService));
+  }
+  if (options.authService && options.companyService) {
+    app.use('/api/v1/companies', createCompanyProfileRouter(options.authService, options.companyService));
+    app.use('/api/v1/company/members', createCompanyMembersRouter(options.authService, options.companyService));
   }
   if (options.authService && options.candidateService) {
     app.use('/api/v1/candidate', createCandidateRouter(options.authService, options.candidateService));
@@ -97,6 +105,7 @@ export function createApp(options: AppOptions = {}) {
       error instanceof AdminError ||
       error instanceof AuthError ||
       error instanceof CandidateError ||
+      error instanceof CompanyError ||
       error instanceof CvError ||
       error instanceof DiscoveryError ||
       error instanceof InterviewsError ||

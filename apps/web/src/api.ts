@@ -149,6 +149,28 @@ export interface CompanyVerification {
 
 export type CompanyVerificationStatusView = Omit<CompanyVerification, 'submittedByEmail' | 'reviewNote'>;
 
+export interface CompanyProfile {
+  id: string;
+  name: string;
+  countryCode: string;
+  city: string;
+  commercialRegistrationNumber: string;
+  industry: string | null;
+  companySize: string | null;
+  website: string | null;
+  description: string | null;
+  verificationStatus: CompanyVerification['verificationStatus'];
+  operationalStatus: CompanyVerification['operationalStatus'];
+}
+
+export interface CompanyMember {
+  id: string;
+  email: string;
+  role: 'company_owner' | 'company_admin' | 'recruiter';
+  status: 'active' | 'suspended';
+  createdAt: string;
+}
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? '';
 const CSRF_KEY = 'cvideo_csrf';
 
@@ -231,6 +253,10 @@ export const api = {
   approveCompanyVerification: (id: string, note?: string) => apiRequest<CompanyVerification>(`/api/v1/admin/company-verifications/${encodeURIComponent(id)}/approve`, { method: 'POST', body: jsonBody({ note }) }),
   rejectCompanyVerification: (id: string, reason: string, note?: string) => apiRequest<CompanyVerification>(`/api/v1/admin/company-verifications/${encodeURIComponent(id)}/reject`, { method: 'POST', body: jsonBody({ reason, note }) }),
   setCompanyOperationalStatus: (companyId: string, status: CompanyVerification['operationalStatus']) => apiRequest<CompanyVerification>(`/api/v1/admin/companies/${encodeURIComponent(companyId)}/status`, { method: 'PUT', body: jsonBody({ status }) }),
+  getCompanyProfile: () => apiRequest<CompanyProfile>('/api/v1/companies/me'),
+  updateCompanyProfile: (input: Pick<CompanyProfile, 'name' | 'city' | 'industry' | 'companySize' | 'website' | 'description'>) => apiRequest<CompanyProfile>('/api/v1/companies/me', { method: 'PUT', body: jsonBody(input) }),
+  listCompanyMembers: () => apiRequest<CompanyMember[]>('/api/v1/company/members'),
+  updateCompanyMember: (id: string, input: Pick<CompanyMember, 'role' | 'status'>) => apiRequest<CompanyMember>(`/api/v1/company/members/${encodeURIComponent(id)}`, { method: 'PUT', body: jsonBody(input) }),
 
   getCandidateProfile: () => apiRequest<CandidateProfile>('/api/v1/candidate/profile'),
   updateCandidateProfile: (input: unknown) => apiRequest<CandidateProfile>('/api/v1/candidate/profile', { method: 'PUT', body: jsonBody(input) }),

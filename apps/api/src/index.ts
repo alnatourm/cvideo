@@ -5,6 +5,8 @@ import { DrizzleAuthRepository } from './auth/drizzle-repository.js';
 import { AuthService } from './auth/service.js';
 import { DrizzleCandidateRepository } from './candidate/drizzle-repository.js';
 import { CandidateService } from './candidate/service.js';
+import { DrizzleCompanyRepository } from './company/drizzle-repository.js';
+import { CompanyService } from './company/service.js';
 import { DrizzleCvRepository } from './cv/drizzle-repository.js';
 import { DeferredDocumentProvider, FilesystemDocumentProvider } from './cv/provider.js';
 import { CvService } from './cv/service.js';
@@ -30,6 +32,7 @@ const { db, client } = createDatabase(databaseUrl);
 const authService = new AuthService(new DrizzleAuthRepository(db));
 const companyVerificationService = new CompanyVerificationService(new DrizzleCompanyVerificationRepository(db));
 const candidateService = new CandidateService(new DrizzleCandidateRepository(db));
+const companyService = new CompanyService(new DrizzleCompanyRepository(db));
 const cvStorageDirectory = process.env.CV_DOCUMENT_STORAGE_DIR?.trim();
 const documentProvider = cvStorageDirectory
   ? new FilesystemDocumentProvider(cvStorageDirectory)
@@ -54,6 +57,7 @@ const app = createApp({
   authService,
   companyVerificationService,
   candidateService,
+  companyService,
   cvService,
   discoveryService,
   interviewsService,
