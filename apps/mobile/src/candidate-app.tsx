@@ -130,8 +130,8 @@ export function CandidateApp({
 
   useEffect(() => {
     if (video?.status !== 'processing' && video?.status !== 'uploading') return;
-    const timer = setTimeout(() => { void refreshVideo(true); }, 6000);
-    return () => clearTimeout(timer);
+    const timer = setInterval(() => { void refreshVideo(true); }, 6000);
+    return () => clearInterval(timer);
   }, [video?.status, video?.id]);
 
   async function refreshVideo(silent = false) {
