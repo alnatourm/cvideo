@@ -1,6 +1,7 @@
 import cookieParser from 'cookie-parser';
 import express, { type ErrorRequestHandler } from 'express';
 import helmet from 'helmet';
+import { resolve } from 'node:path';
 import { ZodError } from 'zod';
 import { AdminError } from './admin/errors.js';
 import { createAdminRouter, createCompanyVerificationRouter } from './admin/routes.js';
@@ -48,6 +49,7 @@ export interface AppOptions {
   savedListsService?: SavedListsService;
   taxonomyService?: TaxonomyService;
   secureCookies?: boolean;
+  webDistDirectory?: string;
 }
 
 export function createApp(options: AppOptions = {}) {
@@ -94,6 +96,21 @@ export function createApp(options: AppOptions = {}) {
   }
   if (options.authService && options.interviewsService) {
     app.use('/api/v1/interviews', createInterviewsRouter(options.authService, options.interviewsService));
+  }
+
+  if (options.webDistDirectory) {
+    const webIndex = resolve(options.webDistDirectory, 'index.html');
+    app.use(express.static(options.webDistDirectory, { index: false }));
+    app.get('/{*path}', (req, res, next) => {
+      if (req.path === '/api' || req.path.startsWith('/api/')) {
+        next();
+        return;
+      }
+
+      res.sendFile(webIndex, (error) => {
+        if (error) next(error);
+      });
+    });
   }
 
   app.use((_req, res) => {

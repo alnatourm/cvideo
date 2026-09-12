@@ -51,13 +51,9 @@ jobs:
         run: pnpm test
       - name: Apply database migrations
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0001_candidate_profile_core.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0002_identity_tenant_security.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0003_candidate_discovery_settings.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0004_saved_lists.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0005_messaging.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0006_interviews.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0007_company_verification_admin.sql
+          pnpm --filter @cvideo/api db:migrate
+          pnpm --filter @cvideo/api db:migrate
+          psql "$DATABASE_URL" -Atc "select count(*) from cvideo_schema_migrations;" | grep -qx 7
       - name: Verify migrated schema and security relationships
         run: |
           psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_profiles');" | grep -qx candidate_profiles

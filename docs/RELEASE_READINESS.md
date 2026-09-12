@@ -15,6 +15,8 @@ This document is the operator checklist for the current stacked v1 build. Passin
 
 Cross-origin browser hosting is not configured in v1. A separate web origin requires an explicit, reviewed CORS and cookie policy before deployment.
 
+For the current Railway staging procedure, use [`docs/RAILWAY_STAGING.md`](./RAILWAY_STAGING.md). Railway staging evidence does not authorize production release.
+
 ## Build artifacts
 
 From the repository root with Node 22.13+ and pnpm 10.15.1:
@@ -51,9 +53,10 @@ Never commit populated environment files, database dumps, OAuth credentials, mob
 ## Database deployment
 
 1. Take and verify a recoverable production backup.
-2. Apply `database/migrations/0001` through `0007` in numeric order with `ON_ERROR_STOP=1`.
-3. Run the same schema/security assertions used by `.github/workflows/ci.yml`.
-4. Deploy the compiled API only after migration success.
+2. Run `pnpm --filter @cvideo/api db:migrate`. The runner applies pending migrations in numeric order, records checksums and refuses changed migration files.
+3. Run the migration command a second time and verify that all migrations report `migration_current`.
+4. Run the same schema/security assertions used by `.github/workflows/ci.yml`.
+5. Deploy the compiled API only after migration success.
 
 The repository does not contain destructive down migrations. Roll back application code independently; do not reverse database changes without a reviewed recovery plan.
 
