@@ -34,7 +34,7 @@ import {
   type TaxonomyItem,
 } from './api';
 import { useAuth } from './auth';
-import { direction, type Locale, t } from './i18n';
+import { direction, landingFlowSteps, type Locale, t } from './i18n';
 
 const companyRoles: EffectiveRole[] = ['company_owner', 'company_admin', 'recruiter'];
 
@@ -87,7 +87,7 @@ function PublicHeader({ locale, setLocale }: { locale: Locale; setLocale: (local
   return (
     <header className="header glass">
       <Link to="/" className="brand"><span className="brand-mark">C</span>VIDEO</Link>
-      <nav className="nav" aria-label="Public navigation">
+      <nav className="nav" aria-label={text(locale, 'Public navigation', 'التنقل العام')}>
         <a href="#how">{text(locale, 'How it works', 'كيف يعمل')}</a>
         <a href="#candidates">{text(locale, 'For candidates', 'للباحثين عن فرص')}</a>
         <a href="#companies">{text(locale, 'For companies', 'للشركات')}</a>
@@ -140,14 +140,8 @@ function Landing({ locale, setLocale }: { locale: Locale; setLocale: (locale: Lo
           <span className="eyebrow">{text(locale, 'The CVIDEO flow', 'رحلة CVIDEO')}</span>
           <h2>{text(locale, 'Search → Watch → Save → Chat → Interview', 'ابحث ← شاهد ← احفظ ← تحدث ← قابل')}</h2>
           <div className="section-grid five">
-            {[
-              ['01', 'Search', 'Search professional profiles by role, skill, experience and location.', 'ابحث في الملفات المهنية حسب الدور والمهارة والخبرة والموقع.'],
-              ['02', 'Watch', 'See the person through a concise 30-second Introduction Video.', 'تعرّف على الشخص عبر فيديو تعريفي مهني مدته 30 ثانية.'],
-              ['03', 'Save', 'Organize promising people in company Saved Lists.', 'نظّم المرشحين المناسبين في قوائم الشركة المحفوظة.'],
-              ['04', 'Chat', 'The company starts the first professional conversation.', 'تبدأ الشركة أول محادثة مهنية مع المرشح.'],
-              ['05', 'Interview', 'Send an interview request and let the candidate respond.', 'أرسل طلب مقابلة ودع المرشح يختار الرد المناسب.'],
-            ].map(([number, title, en, ar]) => (
-              <article key={number} className="flow-card"><b>{number}</b><h3>{title}</h3><p>{text(locale, en, ar)}</p></article>
+            {landingFlowSteps(locale).map(([number, title, description]) => (
+              <article key={number} className="flow-card"><b>{number}</b><h3>{title}</h3><p>{description}</p></article>
             ))}
           </div>
         </section>
@@ -330,7 +324,7 @@ function AppShell({ locale, setLocale, children }: { locale: Locale; setLocale: 
         </div>
       </aside>
       <main className="app-content">{children}</main>
-      <nav className="mobile-nav" aria-label="Mobile navigation">
+      <nav className="mobile-nav" aria-label={text(locale, 'Mobile navigation', 'التنقل عبر الهاتف')}>
         {items.map(([path, label, icon]) => <Link key={path} className={location.pathname === path ? 'active' : ''} to={path}><span>{icon}</span><small>{label}</small></Link>)}
       </nav>
     </div>

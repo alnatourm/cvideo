@@ -40,3 +40,24 @@ export function t(locale: Locale, key: keyof typeof messages.en): string {
 export function direction(locale: Locale): 'ltr' | 'rtl' {
   return locale === 'ar' ? 'rtl' : 'ltr';
 }
+
+const flowSteps = {
+  en: [
+    ['01', 'Search', 'Search professional profiles by role, skill, experience and location.'],
+    ['02', 'Watch', 'See the person through a concise 30-second Introduction Video.'],
+    ['03', 'Save', 'Organize promising people in company Saved Lists.'],
+    ['04', 'Chat', 'The company starts the first professional conversation.'],
+    ['05', 'Interview', 'Send an interview request and let the candidate respond.'],
+  ],
+  ar: [
+    ['01', 'ابحث', 'ابحث في الملفات المهنية حسب الدور والمهارة والخبرة والموقع.'],
+    ['02', 'شاهد', 'تعرّف على الشخص عبر فيديو تعريفي مهني مدته 30 ثانية.'],
+    ['03', 'احفظ', 'نظّم المرشحين المناسبين في قوائم الشركة المحفوظة.'],
+    ['04', 'تحدث', 'تبدأ الشركة أول محادثة مهنية مع المرشح.'],
+    ['05', 'قابل', 'أرسل طلب مقابلة ودع المرشح يختار الرد المناسب.'],
+  ],
+} as const;
+
+export function landingFlowSteps(locale: Locale) {
+  return flowSteps[locale];
+}
