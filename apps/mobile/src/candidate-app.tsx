@@ -12,6 +12,7 @@ import {
   type TaxonomyItem,
 } from './api';
 import { MessagesPanel } from './messages-panel';
+import { ProfileEvidenceEditor } from './profile-evidence-editor';
 import {
   BottomTabs,
   Card,
@@ -256,6 +257,10 @@ export function CandidateApp({
     } catch (err) { setError(errorMessage(locale, err)); } finally { setBusy(''); }
   }
 
+  function evidenceChanged() {
+    void api.completeness().then((value) => setCompleteness(value.percent)).catch(() => undefined);
+  }
+
   const logoutButton = <Pressable style={styles.logout} onPress={onLogout}><Text style={styles.logoutText}>{tx(locale, 'Logout', 'خروج')}</Text></Pressable>;
 
   return (
@@ -329,9 +334,9 @@ export function CandidateApp({
                 <Text style={[styles.sectionLabel, rtl && styles.rtl]}>{tx(locale, 'Languages', 'اللغات')}</Text>
                 <ChoiceChips locale={locale} items={languages} selected={profile.languageIds} max={20} onChange={(languageIds) => setProfile({ ...profile, languageIds })} />
                 <PrimaryButton label={busy === 'profile' ? tx(locale, 'Saving…', 'جاري الحفظ…') : tx(locale, 'Save profile', 'حفظ الملف')} onPress={() => void saveProfile()} disabled={busy === 'profile'} />
-                <Text style={[styles.meta, rtl && styles.rtl]}>{tx(locale, 'Experience, education and certificates remain available through the same protected API and are included in the next mobile editor refinement.', 'الخبرة والتعليم والشهادات متاحة عبر نفس الواجهة المحمية وستضاف إلى تحسين محرر الهاتف التالي.')}</Text>
               </Card>
             )}
+            {profile ? <ProfileEvidenceEditor locale={locale} initialExperience={profile.experience} initialEducation={profile.education} initialCertificates={profile.certificates} onChanged={evidenceChanged} onError={setError} onNotice={setNotice} /> : null}
           </>
         ) : null}
       </Screen>

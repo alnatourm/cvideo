@@ -27,6 +27,41 @@ export interface CandidateVideo {
   failureReason?: string | null;
 }
 
+export interface CandidateExperience {
+  id: string;
+  companyName: string;
+  jobTitle: string;
+  location: string | null;
+  startDate: string;
+  endDate: string | null;
+  isCurrent: boolean;
+  description: string | null;
+}
+
+export interface CandidateEducation {
+  id: string;
+  institution: string;
+  qualification: string;
+  fieldOfStudy: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  description: string | null;
+}
+
+export interface CandidateCertificate {
+  id: string;
+  name: string;
+  issuingOrganization: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  credentialId: string | null;
+  credentialUrl: string | null;
+}
+
+export type CandidateExperienceInput = Omit<CandidateExperience, 'id'>;
+export type CandidateEducationInput = Omit<CandidateEducation, 'id'>;
+export type CandidateCertificateInput = Omit<CandidateCertificate, 'id'>;
+
 export interface CandidateProfile {
   id: string;
   displayName: string;
@@ -43,9 +78,9 @@ export interface CandidateProfile {
   preferredRoleIds: string[];
   skillIds: string[];
   languageIds: string[];
-  experience: Array<Record<string, unknown>>;
-  education: Array<Record<string, unknown>>;
-  certificates: Array<Record<string, unknown>>;
+  experience: CandidateExperience[];
+  education: CandidateEducation[];
+  certificates: CandidateCertificate[];
   video: CandidateVideo | null;
 }
 
@@ -220,6 +255,15 @@ export const api = {
 
   candidateProfile: () => request<CandidateProfile>('/api/v1/candidate/profile'),
   updateCandidateProfile: (input: unknown) => request<CandidateProfile>('/api/v1/candidate/profile', { method: 'PUT', body: json(input) }),
+  createExperience: (input: CandidateExperienceInput) => request<CandidateExperience>('/api/v1/candidate/experience', { method: 'POST', body: json(input) }),
+  updateExperience: (id: string, input: CandidateExperienceInput) => request<CandidateExperience>(`/api/v1/candidate/experience/${encodeURIComponent(id)}`, { method: 'PUT', body: json(input) }),
+  deleteExperience: (id: string) => request<void>(`/api/v1/candidate/experience/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createEducation: (input: CandidateEducationInput) => request<CandidateEducation>('/api/v1/candidate/education', { method: 'POST', body: json(input) }),
+  updateEducation: (id: string, input: CandidateEducationInput) => request<CandidateEducation>(`/api/v1/candidate/education/${encodeURIComponent(id)}`, { method: 'PUT', body: json(input) }),
+  deleteEducation: (id: string) => request<void>(`/api/v1/candidate/education/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createCertificate: (input: CandidateCertificateInput) => request<CandidateCertificate>('/api/v1/candidate/certificates', { method: 'POST', body: json(input) }),
+  updateCertificate: (id: string, input: CandidateCertificateInput) => request<CandidateCertificate>(`/api/v1/candidate/certificates/${encodeURIComponent(id)}`, { method: 'PUT', body: json(input) }),
+  deleteCertificate: (id: string) => request<void>(`/api/v1/candidate/certificates/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   completeness: () => request<{ completed: number; total: number; percent: number }>('/api/v1/candidate/profile/completeness'),
   visibility: () => request<{ discoverable: boolean }>('/api/v1/candidate/visibility'),
   setVisibility: (discoverable: boolean) => request<{ discoverable: boolean }>('/api/v1/candidate/visibility', { method: 'PUT', body: json({ discoverable }) }),
