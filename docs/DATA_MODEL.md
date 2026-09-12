@@ -163,6 +163,8 @@ One active/current introduction video per candidate in v1; historical replacemen
 - created_at
 Unique active company + user relationship according to membership policy.
 
+Company profile edits and member role/status changes are audited. Country and Commercial Registration Number are read-only in the company self-service API because changing either would require an explicit reverification policy.
+
 ### company_verifications
 - id
 - company_id

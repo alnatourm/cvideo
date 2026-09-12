@@ -25,6 +25,8 @@ import {
   type CandidateVideo,
   type CompanyVerification,
   type CompanyVerificationStatusView,
+  type CompanyMember,
+  type CompanyProfile,
   type ChatMessage,
   type EffectiveRole,
   type Interview,
@@ -777,17 +779,55 @@ function CompanyAccount({ locale, setLocale }: { locale: Locale; setLocale: (loc
   const { principal } = useAuth();
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [verification, setVerification] = useState<CompanyVerificationStatusView | null>(null);
+  const [profile, setProfile] = useState<CompanyProfile | null>(null);
+  const [members, setMembers] = useState<CompanyMember[]>([]);
+  const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  async function load() {
+    setError('');
+    try {
+      const [items, status, company, team] = await Promise.all([api.listInterviews(), api.getCompanyVerification(), api.getCompanyProfile(), api.listCompanyMembers()]);
+      setInterviews(items); setVerification(status); setProfile(company); setMembers(team);
+    } catch (err) { setError(errorMessage(err)); }
+  }
   useEffect(() => {
-    void Promise.all([api.listInterviews(), api.getCompanyVerification()])
-      .then(([items, status]) => { setInterviews(items); setVerification(status); })
-      .catch((err) => setError(errorMessage(err)));
+    void load();
   }, []);
+
+  async function saveProfile(event: FormEvent) {
+    event.preventDefault(); if (!profile || (principal?.effectiveRole !== 'company_owner' && principal?.effectiveRole !== 'company_admin')) return;
+    setBusy('profile'); setError(''); setNotice('');
+    try {
+      const updated = await api.updateCompanyProfile({ name: profile.name, city: profile.city, industry: profile.industry, companySize: profile.companySize, website: profile.website, description: profile.description });
+      setProfile(updated); setNotice(text(locale, 'Company profile saved.', 'تم حفظ ملف الشركة.'));
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  async function updateMember(member: CompanyMember, next: Pick<CompanyMember, 'role' | 'status'>) {
+    setBusy(member.id); setError(''); setNotice('');
+    try {
+      const updated = await api.updateCompanyMember(member.id, next);
+      setMembers((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setNotice(text(locale, 'Team member updated.', 'تم تحديث عضو الفريق.'));
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  const canEditProfile = principal?.effectiveRole === 'company_owner' || principal?.effectiveRole === 'company_admin';
+  function canManage(member: CompanyMember) {
+    if (member.id === principal?.companyMemberId || member.role === 'company_owner') return false;
+    if (principal?.effectiveRole === 'company_owner') return true;
+    return principal?.effectiveRole === 'company_admin' && member.role === 'recruiter';
+  }
+
   return <AppShell locale={locale} setLocale={setLocale}>
-    <PageHead eyebrow={text(locale, 'Company Account', 'حساب الشركة')} title={verification?.companyName ?? text(locale, 'Company workspace', 'مساحة الشركة')} description={text(locale, 'Your account, verification state and interview activity.', 'حسابك وحالة التحقق ونشاط المقابلات.')}/>
-    {error && <div className="notice error">{error}</div>}
+    <PageHead eyebrow={text(locale, 'Company Account', 'حساب الشركة')} title={profile?.name ?? verification?.companyName ?? text(locale, 'Company workspace', 'مساحة الشركة')} description={text(locale, 'Manage your company profile, verification state and authorized team.', 'أدر ملف شركتك وحالة التحقق والفريق المصرح له.')}/>
+    {error && <div className="notice error">{error}</div>}{notice && <div className="notice success">{notice}</div>}
     <div className="metric-grid"><Metric label={text(locale, 'Role', 'الدور')} value={principal?.effectiveRole.replaceAll('_', ' ') ?? ''}/><Metric label={text(locale, 'Verification', 'التحقق')} value={verification?.verificationStatus.toUpperCase() ?? '—'}/><Metric label={text(locale, 'Account status', 'حالة الحساب')} value={verification?.operationalStatus.toUpperCase() ?? '—'}/><Metric label={text(locale, 'Interview requests', 'طلبات المقابلة')} value={String(interviews.length)}/></div>
     {verification && <section className="panel"><span className="eyebrow">{text(locale, 'Company verification', 'التحقق من الشركة')}</span><h2>{verification.countryCode} · {verification.commercialRegistrationNumber}</h2><p className="muted">{verification.verificationStatus === 'pending' ? text(locale, 'Your registration is awaiting manual CVIDEO review.', 'سجل شركتك بانتظار مراجعة يدوية من CVIDEO.') : verification.verificationStatus === 'verified' ? text(locale, 'Your company registration has been verified.', 'تم التحقق من سجل شركتك.') : text(locale, `Verification rejected: ${verification.rejectionReason ?? 'Contact support for details.'}`, `تم رفض التحقق: ${verification.rejectionReason ?? 'تواصل مع الدعم للتفاصيل.'}`)}</p></section>}
+    {profile && <form className="panel form-grid two" onSubmit={saveProfile}><div className="panel-head span-two"><div><span className="eyebrow">{text(locale, 'Company profile', 'ملف الشركة')}</span><h2>{text(locale, 'Public business details', 'بيانات الشركة')}</h2></div>{canEditProfile && <button className="button primary" disabled={busy === 'profile'}>{text(locale, 'Save changes', 'حفظ التغييرات')}</button>}</div><label>{text(locale, 'Company name', 'اسم الشركة')}<input value={profile.name} disabled={!canEditProfile} onChange={(e) => setProfile({ ...profile, name: e.target.value })}/></label><label>{text(locale, 'City', 'المدينة')}<input value={profile.city} disabled={!canEditProfile} onChange={(e) => setProfile({ ...profile, city: e.target.value })}/></label><label>{text(locale, 'Industry', 'القطاع')}<input value={profile.industry ?? ''} disabled={!canEditProfile} onChange={(e) => setProfile({ ...profile, industry: e.target.value || null })}/></label><label>{text(locale, 'Company size', 'حجم الشركة')}<input value={profile.companySize ?? ''} disabled={!canEditProfile} placeholder="11-50" onChange={(e) => setProfile({ ...profile, companySize: e.target.value || null })}/></label><label className="span-two">{text(locale, 'Website', 'الموقع الإلكتروني')}<input type="url" value={profile.website ?? ''} disabled={!canEditProfile} onChange={(e) => setProfile({ ...profile, website: e.target.value || null })}/></label><label className="span-two">{text(locale, 'Description', 'الوصف')}<textarea rows={4} value={profile.description ?? ''} disabled={!canEditProfile} onChange={(e) => setProfile({ ...profile, description: e.target.value || null })}/></label><p className="tiny muted span-two">{text(locale, 'Country and Commercial Registration Number are read-only because changing them requires a new verification policy.', 'الدولة ورقم السجل التجاري للقراءة فقط لأن تغييرهما يتطلب سياسة تحقق جديدة.')}</p></form>}
+    <section className="panel"><div className="panel-head"><div><span className="eyebrow">{text(locale, 'Authorized team', 'الفريق المصرح')}</span><h2>{members.length} {text(locale, 'members', 'أعضاء')}</h2></div></div>{members.length === 0 ? <div className="empty-state">{text(locale, 'No team members found.', 'لم يتم العثور على أعضاء.')}</div> : members.map((member) => <article className="interview-row" key={member.id}><div><span className={`status ${member.status}`}>{member.status}</span><h3>{member.email}</h3><p>{member.role.replaceAll('_', ' ')}</p></div>{canManage(member) && <div className="actions compact-actions">{principal?.effectiveRole === 'company_owner' && <select value={member.role} disabled={busy === member.id} onChange={(e) => void updateMember(member, { role: e.target.value as CompanyMember['role'], status: member.status })}><option value="company_admin">{text(locale, 'Company admin', 'مدير الشركة')}</option><option value="recruiter">{text(locale, 'Recruiter', 'مسؤول توظيف')}</option></select>}<button type="button" className="button secondary small" disabled={busy === member.id} onClick={() => void updateMember(member, { role: member.role, status: member.status === 'active' ? 'suspended' : 'active' })}>{member.status === 'active' ? text(locale, 'Suspend', 'تعليق') : text(locale, 'Reactivate', 'إعادة تفعيل')}</button></div>}</article>) }<p className="tiny muted">{text(locale, 'Secure email invitations are intentionally deferred until the delivery and token policy is approved.', 'تم تأجيل دعوات البريد الآمنة حتى اعتماد سياسة الإرسال والرموز.')}</p></section>
     <section className="panel"><h2>{text(locale, 'Recent interview activity', 'نشاط المقابلات الأخير')}</h2>{interviews.length === 0 ? <div className="empty-state">{text(locale, 'No interviews requested yet.', 'لا توجد مقابلات بعد.')}</div> : interviews.slice(0, 8).map((item) => <article className="interview-row" key={item.id}><div><span className={`status ${item.status}`}>{item.status}</span><h3>{item.opportunityTitle}</h3><p>{new Date(item.startsAtUtc).toLocaleString()}</p></div></article>)}</section>
   </AppShell>;
 }

@@ -69,11 +69,9 @@ The company verification response includes the manual review status (`pending`, 
 
 Members:
 - `GET /company/members`
-- `POST /company/members`
 - `PUT /company/members/:id`
-- `DELETE /company/members/:id`
 
-Member actions are tenant-scoped and role-restricted.
+Member reads are tenant-scoped. Owner/admin mutations enforce the approved role hierarchy, prevent self/owner modification and write audit events. Suspension is reversible through `PUT`; destructive member deletion is not used. Secure email invitations remain deferred until delivery and token policies are approved.
 
 ## Recruiter candidate search
 - `GET /search/candidates`
