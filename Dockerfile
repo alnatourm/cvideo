@@ -10,6 +10,7 @@ FROM node:24-bookworm-slim AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
+ENV PORT=3000
 RUN corepack enable && corepack prepare pnpm@10.15.1 --activate
 COPY --from=build /app /app
 EXPOSE 3000

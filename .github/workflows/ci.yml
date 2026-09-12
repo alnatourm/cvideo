@@ -76,11 +76,14 @@ jobs:
           psql "$DATABASE_URL" -Atc "select count(*) from pg_indexes where indexname = 'conversations_company_candidate_unique' and indexdef ilike 'CREATE UNIQUE INDEX%';" | grep -qx 1
           psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conrelid = 'public.interviews'::regclass and contype in ('c','f');" | grep -qE '^[4-9][0-9]*$'
           psql "$DATABASE_URL" -Atc "select count(*) from information_schema.columns where table_name = 'companies' and column_name = 'operational_status';" | grep -qx 1
-      - name: Smoke test compiled API
-        env:
-          CVIDEO_SMOKE_API_ORIGIN: http://127.0.0.1:4000
-          NODE_ENV: production
-          PORT: 4000
+      - name: Build deployment image
+        run: docker build --tag cvideo:ci .
+      - name: Smoke test deployment image
         run: |
-          pnpm --filter @cvideo/api start > /tmp/cvideo-api.log 2>&1 &
+          docker run --detach --rm --name cvideo-ci \
+            --env DATABASE_URL=postgres://cvideo:cvideo@127.0.0.1:65432/cvideo \
+            --publish 4000:3000 \
+            cvideo:ci
+          CVIDEO_SMOKE_API_ORIGIN=http://127.0.0.1:4000 \
+          CVIDEO_SMOKE_WEB_ORIGIN=http://127.0.0.1:4000 \
           pnpm smoke:release

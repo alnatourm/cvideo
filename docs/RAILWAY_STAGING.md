@@ -44,6 +44,7 @@ Never mount private documents inside `apps/web/dist` or expose the volume as a s
 - [ ] `GET /api/v1/unknown` returns the canonical JSON 404 envelope.
 - [ ] PostgreSQL has no public domain or public TCP exposure.
 - [ ] The repository CI run succeeds, including the migration runner's second idempotence pass.
+- [ ] CI builds and smoke-tests the same root Dockerfile used by Railway.
 
 After all checks pass, stop the old standalone web service and confirm the unified URL again. Then remove the old web service and the Railway mobile service. Keep PostgreSQL and its volume.
 
