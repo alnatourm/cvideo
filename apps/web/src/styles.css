@@ -254,7 +254,7 @@ label { display: grid; gap: 7px; font-size: .9rem; font-weight: 700; color: #334
 @media (max-width: 780px) {
   .header { min-height: 68px; padding: 10px 16px; }
   .nav { gap: 8px; }
-  .nav > a:not(.button), .nav > .button { display: none; }
+  .nav > a[href^="#"] { display: none; }
   .hero { padding: 48px 18px; gap: 34px; }
   .hero h1 { font-size: clamp(2.7rem, 13vw, 4.6rem); }
   .hero-video-stage { min-height: 530px; }
