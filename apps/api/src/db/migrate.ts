@@ -76,7 +76,28 @@ async function migrate() {
 }
 
 migrate().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : 'Unknown migration failure';
-  console.error(JSON.stringify({ level: 'error', service: 'cvideo-migrate', message }));
+  const errorRecord = typeof error === 'object' && error !== null ? (error as Record<string, unknown>) : {};
+  const nestedErrors = Array.isArray(errorRecord.errors)
+    ? errorRecord.errors.slice(0, 3).map((nestedError: unknown) => {
+        const nestedRecord = typeof nestedError === 'object' && nestedError !== null
+          ? (nestedError as Record<string, unknown>)
+          : {};
+        return {
+          name: nestedError instanceof Error ? nestedError.name : 'UnknownError',
+          code: typeof nestedRecord.code === 'string' ? nestedRecord.code : undefined,
+          detail: nestedError instanceof Error && nestedError.message ? nestedError.message : 'No error detail',
+        };
+      })
+    : [];
+
+  console.error(JSON.stringify({
+    level: 'error',
+    service: 'cvideo-migrate',
+    event: 'migration_failed',
+    errorName: error instanceof Error ? error.name : 'UnknownError',
+    errorCode: typeof errorRecord.code === 'string' ? errorRecord.code : undefined,
+    errorDetail: error instanceof Error && error.message ? error.message : 'No top-level error detail',
+    nestedErrors,
+  }));
   process.exitCode = 1;
 });
