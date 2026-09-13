@@ -55,6 +55,7 @@ interface BunnyVideoResponse {
   length?: number;
   status?: number;
   height?: number;
+  width?: number;
   thumbnailFileName?: string | null;
   transcodingMessages?: Array<{ message?: string | null }> | null;
 }
@@ -145,7 +146,9 @@ export class BunnyStreamVideoProvider implements VideoProvider {
       assetId,
       state,
       durationSeconds: Number.isFinite(data.length) ? Number(data.length) : null,
-      height: Number.isFinite(data.height) ? Number(data.height) : null,
+      height: Number.isFinite(data.height) && Number.isFinite(data.width)
+        ? Math.min(Number(data.height), Number(data.width))
+        : Number.isFinite(data.height) ? Number(data.height) : null,
       playbackUrl: state === 'ready' ? `${this.cdnBase}/${encodeURIComponent(assetId)}/playlist.m3u8` : null,
       thumbnailUrl,
       failureReason,

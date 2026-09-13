@@ -266,9 +266,9 @@ export const api = {
   getCandidateVideo: () => apiRequest<CandidateVideo | null>('/api/v1/candidate/video'),
   startCandidateVideo: (input: { filename: string; mimeType: string; sizeBytes: number; durationSeconds: number; height?: number }) =>
     apiRequest<CandidateVideo & { uploadPath: string; maxBytes: number }>('/api/v1/candidate/video/start', { method: 'POST', body: jsonBody(input) }),
-  uploadCandidateVideo: (file: File) => apiRequest<CandidateVideo>('/api/v1/candidate/video/content', {
+  uploadCandidateVideo: (file: File, mimeType = file.type) => apiRequest<CandidateVideo>('/api/v1/candidate/video/content', {
     method: 'PUT',
-    headers: { 'content-type': file.type },
+    headers: { 'content-type': mimeType },
     body: file,
   }),
   syncCandidateVideo: () => apiRequest<CandidateVideo>('/api/v1/candidate/video/sync', { method: 'POST' }),

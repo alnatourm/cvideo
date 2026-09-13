@@ -33,6 +33,7 @@ import {
   type SavedList,
   type TaxonomyItem,
 } from './api';
+import { inspectVideo, normalizeVideoMimeType } from './video-metadata';
 import { useAuth } from './auth';
 import { direction, landingFlowSteps, type Locale, t } from './i18n';
 
@@ -416,23 +417,6 @@ function CandidateHome({ locale, setLocale }: { locale: Locale; setLocale: (loca
   );
 }
 
-async function inspectVideo(file: File): Promise<{ durationSeconds: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.onloadedmetadata = () => {
-      const durationSeconds = Math.ceil(video.duration);
-      const height = video.videoHeight;
-      URL.revokeObjectURL(url);
-      if (!Number.isFinite(durationSeconds) || !height) reject(new Error('Could not read video metadata'));
-      else resolve({ durationSeconds, height });
-    };
-    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read video file')); };
-    video.src = url;
-  });
-}
-
 function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [video, setVideo] = useState<CandidateVideo | null>(null);
@@ -518,14 +502,20 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
   async function uploadVideo(file: File) {
     setBusy('video'); setError(''); setNotice('');
     try {
+      const mimeType = normalizeVideoMimeType(file);
       const metadata = await inspectVideo(file);
       if (metadata.durationSeconds > 30) throw new Error(text(locale, 'Introduction Video must be 30 seconds or less.', 'يجب ألا يتجاوز الفيديو التعريفي 30 ثانية.'));
       if (metadata.height > 720) throw new Error(text(locale, 'Please choose a video recorded/exported at 720p or below.', 'يرجى اختيار فيديو بدقة 720p أو أقل.'));
-      await api.startCandidateVideo({ filename: file.name, mimeType: file.type, sizeBytes: file.size, durationSeconds: metadata.durationSeconds, height: metadata.height });
-      const processing = await api.uploadCandidateVideo(file);
+      await api.startCandidateVideo({ filename: file.name, mimeType, sizeBytes: file.size, durationSeconds: metadata.durationSeconds, height: metadata.height });
+      const processing = await api.uploadCandidateVideo(file, mimeType);
       setVideo(processing);
       setNotice(text(locale, 'Upload complete. Video is processing.', 'اكتمل الرفع. الفيديو قيد المعالجة.'));
-    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+    } catch (err) {
+      const message = errorMessage(err);
+      setError(message.includes('metadata') || message.includes('format')
+        ? text(locale, 'This video format could not be read. Choose an MP4, MOV, or WebM file up to 30 seconds and 720p.', 'تعذرت قراءة صيغة الفيديو. اختر ملف MP4 أو MOV أو WebM بمدة لا تتجاوز 30 ثانية ودقة 720p.')
+        : message);
+    } finally { setBusy(''); }
   }
 
   async function syncVideo() {
