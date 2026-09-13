@@ -133,7 +133,9 @@ export class BunnyStreamVideoProvider implements VideoProvider {
     });
     const data = (await response.json()) as BunnyVideoResponse;
     const status = data.status ?? 0;
-    const state: VideoProviderSnapshot['state'] = status === 3 ? 'ready' : status === 5 || status === 8 ? 'failed' : 'processing';
+    const state: VideoProviderSnapshot['state'] = status === 3 || status === 4
+      ? 'ready'
+      : status === 5 || status === 8 ? 'failed' : 'processing';
     const thumbnailUrl = data.thumbnailFileName
       ? `${this.cdnBase}/${encodeURIComponent(assetId)}/${encodeURIComponent(data.thumbnailFileName)}`
       : null;
