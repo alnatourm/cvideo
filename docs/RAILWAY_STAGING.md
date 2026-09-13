@@ -39,7 +39,8 @@ Never mount private documents inside `apps/web/dist` or expose the volume as a s
 
 ## Verification before cleanup
 
-- [ ] Deployment pre-deploy logs show migrations `0001` through `0017` as applied or current, including the recruitment taxonomy seed.
+- [ ] Deployment pre-deploy logs show migrations `0001` through `0018` as applied or current, including recruitment taxonomy and languages.
+- [ ] Candidate roles are filtered by specialization and skills are filtered by selected roles.
 - [ ] `GET /api/v1/health` returns HTTP 200 and `{"status":"ok","service":"cvideo-api","version":"v1"}`.
 - [ ] Opening the unified public URL returns the CVIDEO web shell.
 - [ ] Refreshing a nested browser route returns the web shell rather than a 404.
