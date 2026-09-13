@@ -6,11 +6,12 @@ import type { VideoProvider } from './provider.js';
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
 const ALLOWED_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
 
-function presentVideo(record: CandidateVideoMediaRecord) {
+function presentVideo(record: CandidateVideoMediaRecord, videoProvider: VideoProvider) {
   return {
     id: record.id,
     status: record.status,
     playbackUrl: record.playbackUrl,
+    embedUrl: record.providerAssetId ? videoProvider.getEmbedUrl?.(record.providerAssetId) ?? null : null,
     thumbnailUrl: record.thumbnailUrl,
     originalFilename: record.originalFilename,
     mimeType: record.mimeType,
@@ -28,7 +29,7 @@ export class MediaService {
 
   async getOwnVideo(userId: string) {
     const record = await this.repository.getVideoByUserId(userId);
-    return record ? presentVideo(record) : null;
+    return record ? presentVideo(record, this.videoProvider) : null;
   }
 
   async startVideo(userId: string, input: unknown) {
@@ -58,7 +59,7 @@ export class MediaService {
     }
 
     return {
-      ...presentVideo(record),
+      ...presentVideo(record, this.videoProvider),
       provider: this.videoProvider.name,
       uploadPath: '/api/v1/candidate/video/content',
       maxBytes: MAX_VIDEO_BYTES,
@@ -93,7 +94,7 @@ export class MediaService {
       failureReason: null,
     });
     if (!updated) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-    return presentVideo(updated);
+    return presentVideo(updated, this.videoProvider);
   }
 
   async syncVideo(userId: string) {
@@ -111,7 +112,7 @@ export class MediaService {
         failureReason: snapshot.failureReason ?? 'Video processing failed',
       });
       if (!failed) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-      return presentVideo(failed);
+      return presentVideo(failed, this.videoProvider);
     }
 
     if (snapshot.state === 'ready') {
@@ -125,7 +126,7 @@ export class MediaService {
           failureReason: 'Introduction Video must be 30 seconds or less and no higher than 720p',
         });
         if (!rejected) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-        return presentVideo(rejected);
+        return presentVideo(rejected, this.videoProvider);
       }
 
       const ready = await this.repository.updateVideoForUser(userId, {
@@ -137,7 +138,7 @@ export class MediaService {
         failureReason: null,
       });
       if (!ready) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-      return presentVideo(ready);
+      return presentVideo(ready, this.videoProvider);
     }
 
     const processing = await this.repository.updateVideoForUser(userId, {
@@ -147,7 +148,7 @@ export class MediaService {
       failureReason: null,
     });
     if (!processing) throw new MediaError('PROFILE_NOT_FOUND', 404, 'Candidate profile not found');
-    return presentVideo(processing);
+    return presentVideo(processing, this.videoProvider);
   }
 
   async deleteVideo(userId: string) {

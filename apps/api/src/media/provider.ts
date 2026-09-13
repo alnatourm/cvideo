@@ -20,6 +20,7 @@ export interface VideoProviderSnapshot {
 
 export interface VideoProvider {
   readonly name: string;
+  getEmbedUrl?(assetId: string): string | null;
   createAsset(input: VideoProviderCreateInput): Promise<VideoProviderAsset>;
   uploadAsset(assetId: string, body: unknown, contentLength?: number): Promise<void>;
   getAsset(assetId: string): Promise<VideoProviderSnapshot>;
@@ -28,6 +29,10 @@ export interface VideoProvider {
 
 export class DeferredVideoProvider implements VideoProvider {
   readonly name = 'unconfigured';
+
+  getEmbedUrl(_assetId: string): string | null {
+    return null;
+  }
 
   private unavailable(): never {
     throw new MediaError('MEDIA_PROVIDER_NOT_CONFIGURED', 503, 'Video provider is not configured');
@@ -79,6 +84,10 @@ export class BunnyStreamVideoProvider implements VideoProvider {
   ) {
     this.apiBase = `https://video.bunnycdn.com/library/${encodeURIComponent(config.libraryId)}/videos`;
     this.cdnBase = `https://${config.cdnHostname.replace(/^https?:\/\//, '').replace(/\/$/, '')}`;
+  }
+
+  getEmbedUrl(assetId: string): string {
+    return `https://iframe.mediadelivery.net/embed/${encodeURIComponent(this.config.libraryId)}/${encodeURIComponent(assetId)}`;
   }
 
   private async request(url: string, init: RequestInit & { duplex?: 'half' }) {

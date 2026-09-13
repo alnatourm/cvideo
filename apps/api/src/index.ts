@@ -40,7 +40,6 @@ const documentProvider = cvStorageDirectory
   ? new FilesystemDocumentProvider(cvStorageDirectory)
   : new DeferredDocumentProvider();
 const cvService = new CvService(new DrizzleCvRepository(db), documentProvider);
-const discoveryService = new DiscoveryService(new DrizzleDiscoveryRepository(db));
 const interviewsService = new InterviewsService(new DrizzleInterviewsRepository(db), new DeferredGoogleMeetProvider());
 
 const bunnyLibraryId = process.env.BUNNY_STREAM_LIBRARY_ID;
@@ -50,6 +49,7 @@ const videoProvider =
   bunnyLibraryId && bunnyApiKey && bunnyCdnHostname
     ? new BunnyStreamVideoProvider({ libraryId: bunnyLibraryId, apiKey: bunnyApiKey, cdnHostname: bunnyCdnHostname })
     : new DeferredVideoProvider();
+const discoveryService = new DiscoveryService(new DrizzleDiscoveryRepository(db), videoProvider);
 const mediaService = new MediaService(new DrizzleMediaRepository(db), videoProvider);
 
 const messagingService = new MessagingService(new DrizzleMessagingRepository(db));

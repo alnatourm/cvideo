@@ -16,6 +16,7 @@ export interface RecruiterCandidateCard {
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   introductionVideoId: string;
+  introductionVideoProviderAssetId?: string | null;
   introductionVideoUrl: string | null;
   introductionVideoThumbnailUrl: string | null;
 }

@@ -83,6 +83,13 @@ function HlsVideo({ src, poster, className = '' }: { src: string; poster?: strin
   return <video ref={ref} className={className} poster={poster ?? undefined} controls playsInline preload="metadata" />;
 }
 
+function StreamVideo({ embedUrl, playbackUrl, poster, className = '' }: { embedUrl?: string | null; playbackUrl?: string | null; poster?: string | null; className?: string }) {
+  if (embedUrl) {
+    return <iframe className={className} src={embedUrl} title="CVIDEO Introduction Video" loading="lazy" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen />;
+  }
+  return playbackUrl ? <HlsVideo src={playbackUrl} poster={poster} className={className} /> : null;
+}
+
 function PublicHeader({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
   const { principal } = useAuth();
   return (
@@ -394,7 +401,7 @@ function CandidateHome({ locale, setLocale }: { locale: Locale; setLocale: (loca
       <div className="dashboard-grid two-wide">
         <section className="panel video-panel">
           <div className="panel-head"><div><span className="eyebrow">30s</span><h2>{t(locale, 'introVideo')}</h2></div><Link to="/candidate/profile" className="text-link">{text(locale, 'Manage video', 'إدارة الفيديو')}</Link></div>
-          {video?.status === 'ready' && video.playbackUrl ? <HlsVideo src={video.playbackUrl} poster={video.thumbnailUrl} className="candidate-home-video" /> : <div className="video-empty"><strong>{text(locale, 'Your video is not ready yet', 'الفيديو غير جاهز بعد')}</strong><span>{text(locale, 'Upload or finish processing from your Profile.', 'ارفع الفيديو أو أكمل معالجته من ملفك الشخصي.')}</span></div>}
+          {video?.status === 'ready' && (video.embedUrl || video.playbackUrl) ? <StreamVideo embedUrl={video.embedUrl} playbackUrl={video.playbackUrl} poster={video.thumbnailUrl} className="candidate-home-video" /> : <div className="video-empty"><strong>{text(locale, 'Your video is not ready yet', 'الفيديو غير جاهز بعد')}</strong><span>{text(locale, 'Upload or finish processing from your Profile.', 'ارفع الفيديو أو أكمل معالجته من ملفك الشخصي.')}</span></div>}
         </section>
         <section className="panel discovery-panel">
           <span className="eyebrow">{text(locale, 'Visibility', 'الظهور')}</span><h2>{text(locale, 'Let verified company users discover your profile', 'اسمح لمستخدمي الشركات باكتشاف ملفك')}</h2>
@@ -582,7 +589,7 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
 
         <aside className="panel video-manager">
           <span className="eyebrow">{t(locale, 'introVideo')}</span><h2>{text(locale, 'Your first impression', 'انطباعك الأول')}</h2>
-          {video?.status === 'ready' && video.playbackUrl ? <HlsVideo src={video.playbackUrl} poster={video.thumbnailUrl} className="profile-video" /> : <div className="portrait-upload"><span>30</span><small>{text(locale, 'seconds max', 'ثانية كحد أقصى')}</small></div>}
+          {video?.status === 'ready' && (video.embedUrl || video.playbackUrl) ? <StreamVideo embedUrl={video.embedUrl} playbackUrl={video.playbackUrl} poster={video.thumbnailUrl} className="profile-video" /> : <div className="portrait-upload"><span>30</span><small>{text(locale, 'seconds max', 'ثانية كحد أقصى')}</small></div>}
           <div className="video-state"><span className={`status ${video?.status ?? 'missing'}`}>{video?.status ?? text(locale, 'missing', 'غير موجود')}</span>{video?.failureReason && <small>{video.failureReason}</small>}</div>
           <label className={`button secondary full file-button ${busy === 'video' ? 'disabled' : ''}`}>{text(locale, 'Choose 30s video', 'اختر فيديو 30 ثانية')}<input type="file" accept="video/mp4,video/webm,video/quicktime" disabled={busy === 'video'} onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadVideo(file); }} /></label>
           {video && ['processing', 'uploading'].includes(video.status) && <button className="button primary full" disabled={busy === 'video'} onClick={() => void syncVideo()} type="button">{text(locale, 'Check processing', 'فحص المعالجة')}</button>}
@@ -703,7 +710,7 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
         </aside>
 
         <section className="portrait-video recruiter-video-stage">
-          {selected?.introductionVideoUrl ? <HlsVideo src={selected.introductionVideoUrl} poster={selected.introductionVideoThumbnailUrl} className="discovery-video" /> : <div className="portrait-placeholder"><span>▶</span><b>{candidates.length ? text(locale, 'Loading Introduction Video…', 'جاري تحميل الفيديو التعريفي…') : text(locale, 'Search to discover candidates', 'ابحث لاكتشاف المرشحين')}</b></div>}
+          {selected?.introductionVideoEmbedUrl || selected?.introductionVideoUrl ? <StreamVideo embedUrl={selected.introductionVideoEmbedUrl} playbackUrl={selected.introductionVideoUrl} poster={selected.introductionVideoThumbnailUrl} className="discovery-video" /> : <div className="portrait-placeholder"><span>▶</span><b>{candidates.length ? text(locale, 'Loading Introduction Video…', 'جاري تحميل الفيديو التعريفي…') : text(locale, 'Search to discover candidates', 'ابحث لاكتشاف المرشحين')}</b></div>}
           {selected && <div className="video-caption"><span className="video-badge">30s {text(locale, 'Introduction Video', 'فيديو تعريفي')}</span><strong>{selected.displayName}</strong><small>{selected.headline}</small></div>}
         </section>
 

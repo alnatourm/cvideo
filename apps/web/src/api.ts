@@ -37,6 +37,7 @@ export interface CandidateVideo {
   id: string;
   status: 'pending' | 'uploading' | 'processing' | 'ready' | 'rejected' | 'failed';
   playbackUrl?: string | null;
+  embedUrl?: string | null;
   thumbnailUrl?: string | null;
   originalFilename?: string | null;
   mimeType?: string | null;
@@ -56,6 +57,7 @@ export interface CandidateSearchItem {
   primarySubcategoryId: string | null;
   introductionVideoId: string;
   introductionVideoUrl: string | null;
+  introductionVideoEmbedUrl?: string | null;
   introductionVideoThumbnailUrl: string | null;
 }
 

@@ -119,6 +119,7 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
         primaryCategoryId: candidateProfiles.primaryCategoryId,
         primarySubcategoryId: candidateProfiles.primarySubcategoryId,
         introductionVideoId: candidateVideos.id,
+        introductionVideoProviderAssetId: candidateVideos.storageKey,
         introductionVideoUrl: candidateVideos.playbackKey,
         introductionVideoThumbnailUrl: candidateVideos.thumbnailKey,
       })
@@ -148,6 +149,7 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
         professionalSummary: candidateProfiles.professionalSummary,
         cvOriginalFilename: candidateProfiles.cvOriginalFilename,
         introductionVideoId: candidateVideos.id,
+        introductionVideoProviderAssetId: candidateVideos.storageKey,
         introductionVideoUrl: candidateVideos.playbackKey,
         introductionVideoThumbnailUrl: candidateVideos.thumbnailKey,
       })

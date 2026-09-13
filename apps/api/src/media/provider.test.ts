@@ -17,6 +17,8 @@ describe('BunnyStreamVideoProvider', () => {
       cdnHostname: 'video.example.test',
     }, fetchImpl);
 
+    expect(provider.getEmbedUrl('asset-1')).toBe('https://iframe.mediadelivery.net/embed/library-1/asset-1');
+
     await expect(provider.getAsset('asset-1')).resolves.toMatchObject({
       state: 'ready',
       durationSeconds: 9,
