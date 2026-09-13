@@ -48,4 +48,14 @@ describe('CVIDEO taxonomy API', () => {
     expect(search.status).toBe(200);
     expect(search.body.data[0].nameAr).toBe('مدير مبيعات');
   });
+
+  it('treats an empty taxonomy query as an unfiltered request', async () => {
+    const jobTitles = await request(app).get('/api/v1/taxonomy/job-titles?q=');
+    const skills = await request(app).get('/api/v1/taxonomy/skills?q=%20%20');
+
+    expect(jobTitles.status).toBe(200);
+    expect(jobTitles.body.data).toEqual([]);
+    expect(skills.status).toBe(200);
+    expect(skills.body.data).toEqual([]);
+  });
 });

@@ -3,7 +3,10 @@ import type { TaxonomyRepository } from './repository.js';
 
 const idSchema = z.string().uuid();
 const searchSchema = z.object({
-  q: z.string().trim().min(1).max(120).optional(),
+  q: z.preprocess(
+    (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+    z.string().trim().min(1).max(120).optional(),
+  ),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 

@@ -305,7 +305,7 @@ export const api = {
 
   categories: () => apiRequest<TaxonomyItem[]>('/api/v1/taxonomy/categories'),
   subcategories: (categoryId: string) => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/categories/${encodeURIComponent(categoryId)}/subcategories`),
-  jobTitles: (q = '') => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/job-titles?q=${encodeURIComponent(q)}`),
-  skills: (q = '') => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/skills?q=${encodeURIComponent(q)}`),
+  jobTitles: (q = '') => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/job-titles${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`),
+  skills: (q = '') => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/skills${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`),
   languages: () => apiRequest<TaxonomyItem[]>('/api/v1/taxonomy/languages'),
 };
