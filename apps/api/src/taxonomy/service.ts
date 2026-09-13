@@ -8,6 +8,8 @@ const searchSchema = z.object({
     z.string().trim().min(1).max(120).optional(),
   ),
   limit: z.coerce.number().int().min(1).max(1500).optional(),
+  subcategoryId: z.string().uuid().optional(),
+  jobTitleIds: z.array(z.string().uuid()).max(5).optional(),
 });
 
 export class TaxonomyService {
@@ -23,12 +25,12 @@ export class TaxonomyService {
 
   listJobTitles(input: unknown) {
     const value = searchSchema.parse(input);
-    return this.repository.listJobTitles(value.q, value.limit ?? (value.q ? 50 : 1500));
+    return this.repository.listJobTitles(value.q, value.limit ?? (value.q ? 50 : 1500), value.subcategoryId);
   }
 
   listSkills(input: unknown) {
     const value = searchSchema.parse(input);
-    return this.repository.listSkills(value.q, value.limit ?? (value.q ? 50 : 1500));
+    return this.repository.listSkills(value.q, value.limit ?? (value.q ? 50 : 1500), value.jobTitleIds);
   }
 
   listLanguages() {

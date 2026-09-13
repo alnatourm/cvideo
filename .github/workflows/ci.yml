@@ -53,7 +53,7 @@ jobs:
         run: |
           pnpm --filter @cvideo/api db:migrate
           pnpm --filter @cvideo/api db:migrate
-          psql "$DATABASE_URL" -Atc "select count(*) from cvideo_schema_migrations;" | grep -qx 17
+          psql "$DATABASE_URL" -Atc "select count(*) from cvideo_schema_migrations;" | grep -qx 18
       - name: Verify migrated schema and security relationships
         run: |
           psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_profiles');" | grep -qx candidate_profiles
@@ -82,6 +82,7 @@ jobs:
           psql "$DATABASE_URL" -Atc "select count(*) from skills where code like 'SK____';" | grep -qx 400
           psql "$DATABASE_URL" -Atc "select count(*) from job_title_aliases where code like 'JA_____';" | grep -qx 3613
           psql "$DATABASE_URL" -Atc "select count(*) from job_title_skills;" | grep -qx 5080
+          psql "$DATABASE_URL" -Atc "select count(*) from languages where is_active = true;" | grep -qx 30
       - name: Build deployment image
         run: docker build --tag cvideo:ci .
       - name: Smoke test deployment image

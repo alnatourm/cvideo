@@ -447,19 +447,46 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
 
   async function load() {
     try {
-      const [current, currentVideo, categoryList, roleList, skillList, languageList] = await Promise.all([
-        api.getCandidateProfile(), api.getCandidateVideo(), api.categories(), api.jobTitles(), api.skills(), api.languages(),
+      const [current, currentVideo, categoryList, languageList] = await Promise.all([
+        api.getCandidateProfile(), api.getCandidateVideo(), api.categories(), api.languages(),
       ]);
-      setProfile(current); setVideo(currentVideo); setCategories(categoryList); setRoles(roleList); setSkills(skillList); setLanguages(languageList);
-      if (current.primaryCategoryId) setSubcategories(await api.subcategories(current.primaryCategoryId));
+      const [subcategoryList, roleList, skillList] = await Promise.all([
+        current.primaryCategoryId ? api.subcategories(current.primaryCategoryId) : Promise.resolve([]),
+        current.primarySubcategoryId ? api.jobTitles('', current.primarySubcategoryId) : Promise.resolve([]),
+        current.preferredRoleIds.length ? api.skills('', current.preferredRoleIds) : Promise.resolve([]),
+      ]);
+      setProfile(current); setVideo(currentVideo); setCategories(categoryList); setLanguages(languageList);
+      setSubcategories(subcategoryList); setRoles(roleList); setSkills(skillList);
     } catch (err) { setError(errorMessage(err)); }
   }
   useEffect(() => { void load(); }, []);
 
   async function changeCategory(categoryId: string) {
     if (!profile) return;
-    setProfile({ ...profile, primaryCategoryId: categoryId || null, primarySubcategoryId: null });
+    setProfile({
+      ...profile,
+      primaryCategoryId: categoryId || null,
+      primarySubcategoryId: null,
+      preferredRoleIds: [],
+      skillIds: [],
+    });
     setSubcategories(categoryId ? await api.subcategories(categoryId) : []);
+    setRoles([]);
+    setSkills([]);
+  }
+
+  async function changeSubcategory(subcategoryId: string) {
+    if (!profile) return;
+    setProfile({ ...profile, primarySubcategoryId: subcategoryId || null, preferredRoleIds: [], skillIds: [] });
+    setRoles(subcategoryId ? await api.jobTitles('', subcategoryId) : []);
+    setSkills([]);
+  }
+
+  async function changeRoles(roleIds: string[]) {
+    if (!profile) return;
+    const preferredRoleIds = roleIds.slice(0, 5);
+    setProfile({ ...profile, preferredRoleIds, skillIds: [] });
+    setSkills(preferredRoleIds.length ? await api.skills('', preferredRoleIds) : []);
   }
 
   async function saveProfile(event: FormEvent) {
@@ -555,9 +582,9 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
           <label>{text(locale, 'Country code', 'رمز الدولة')}<input value={profile.countryCode} maxLength={2} onChange={(e) => setProfile({ ...profile, countryCode: e.target.value.toUpperCase() })} /></label>
           <label>{text(locale, 'City', 'المدينة')}<input value={profile.city} onChange={(e) => setProfile({ ...profile, city: e.target.value })} /></label>
           <label>{text(locale, 'Main field', 'المجال الرئيسي')}<select value={profile.primaryCategoryId ?? ''} onChange={(e) => void changeCategory(e.target.value)}><option value="">{text(locale, 'Select field', 'اختر المجال')}</option>{categories.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
-          <label>{text(locale, 'Specialization', 'التخصص')}<select value={profile.primarySubcategoryId ?? ''} onChange={(e) => setProfile({ ...profile, primarySubcategoryId: e.target.value || null })}><option value="">{text(locale, 'Select specialization', 'اختر التخصص')}</option>{subcategories.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
+          <label>{text(locale, 'Specialization', 'التخصص')}<select value={profile.primarySubcategoryId ?? ''} onChange={(e) => void changeSubcategory(e.target.value)}><option value="">{text(locale, 'Select specialization', 'اختر التخصص')}</option>{subcategories.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Years of experience', 'سنوات الخبرة')}<input type="number" min={0} max={80} value={profile.yearsExperience} onChange={(e) => setProfile({ ...profile, yearsExperience: Number(e.target.value) })} /></label>
-          <label>{text(locale, 'Preferred roles (up to 5)', 'الأدوار المفضلة (حتى 5)')}<select multiple value={profile.preferredRoleIds} onChange={(e) => setProfile({ ...profile, preferredRoleIds: multiValues(e).slice(0, 5) })}>{roles.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
+          <label>{text(locale, 'Preferred roles (up to 5)', 'الأدوار المفضلة (حتى 5)')}<select multiple value={profile.preferredRoleIds} onChange={(e) => void changeRoles(multiValues(e))}>{roles.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Skills', 'المهارات')}<select multiple value={profile.skillIds} onChange={(e) => setProfile({ ...profile, skillIds: multiValues(e).slice(0, 50) })}>{skills.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Languages', 'اللغات')}<select multiple value={profile.languageIds} onChange={(e) => setProfile({ ...profile, languageIds: multiValues(e).slice(0, 20) })}>{languages.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label className="span-two">{text(locale, 'Professional summary', 'الملخص المهني')}<textarea rows={5} value={profile.professionalSummary ?? ''} onChange={(e) => setProfile({ ...profile, professionalSummary: e.target.value || null })} /></label>

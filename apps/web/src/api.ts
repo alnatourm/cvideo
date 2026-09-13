@@ -305,7 +305,17 @@ export const api = {
 
   categories: () => apiRequest<TaxonomyItem[]>('/api/v1/taxonomy/categories'),
   subcategories: (categoryId: string) => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/categories/${encodeURIComponent(categoryId)}/subcategories`),
-  jobTitles: (q = '') => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/job-titles${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`),
-  skills: (q = '') => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/skills${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`),
+  jobTitles: (q = '', subcategoryId?: string | null) => {
+    const params = new URLSearchParams();
+    if (q.trim()) params.set('q', q.trim());
+    if (subcategoryId) params.set('subcategoryId', subcategoryId);
+    return apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/job-titles?${params.toString()}`);
+  },
+  skills: (q = '', jobTitleIds: string[] = []) => {
+    const params = new URLSearchParams();
+    if (q.trim()) params.set('q', q.trim());
+    if (jobTitleIds.length) params.set('jobTitleIds', jobTitleIds.join(','));
+    return apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/skills?${params.toString()}`);
+  },
   languages: () => apiRequest<TaxonomyItem[]>('/api/v1/taxonomy/languages'),
 };

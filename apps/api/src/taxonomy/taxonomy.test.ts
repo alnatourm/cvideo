@@ -5,7 +5,12 @@ import type { TaxonomyRepository } from './repository.js';
 import { TaxonomyService } from './service.js';
 
 class MemoryTaxonomyRepository implements TaxonomyRepository {
-  readonly calls: Array<{ kind: 'job-titles' | 'skills'; query: string | undefined; limit: number }> = [];
+  readonly calls: Array<{
+    kind: 'job-titles' | 'skills';
+    query: string | undefined;
+    limit: number;
+    filter?: string | string[];
+  }> = [];
 
   async listCategories() {
     return [{ id: '11111111-1111-4111-8111-111111111111', code: 'sales', nameEn: 'Sales', nameAr: 'المبيعات' }];
@@ -15,15 +20,15 @@ class MemoryTaxonomyRepository implements TaxonomyRepository {
     return [{ id: '22222222-2222-4222-8222-222222222222', code: 'b2b', nameEn: 'B2B Sales', nameAr: 'مبيعات الشركات' }];
   }
 
-  async listJobTitles(query: string | undefined, limit: number) {
-    this.calls.push({ kind: 'job-titles', query, limit });
+  async listJobTitles(query: string | undefined, limit: number, subcategoryId?: string) {
+    this.calls.push({ kind: 'job-titles', query, limit, filter: subcategoryId });
     return query
       ? [{ id: '33333333-3333-4333-8333-333333333333', code: 'sales-manager', nameEn: 'Sales Manager', nameAr: 'مدير مبيعات' }]
       : [];
   }
 
-  async listSkills(query: string | undefined, limit: number) {
-    this.calls.push({ kind: 'skills', query, limit });
+  async listSkills(query: string | undefined, limit: number, jobTitleIds?: string[]) {
+    this.calls.push({ kind: 'skills', query, limit, filter: jobTitleIds });
     return query
       ? [{ id: '44444444-4444-4444-8444-444444444444', code: 'negotiation', nameEn: 'Negotiation', nameAr: 'التفاوض' }]
       : [];
@@ -63,13 +68,25 @@ describe('CVIDEO taxonomy API', () => {
     expect(skills.status).toBe(200);
     expect(skills.body.data).toEqual([]);
     expect(repository.calls.slice(-2)).toEqual([
-      { kind: 'job-titles', query: undefined, limit: 1500 },
-      { kind: 'skills', query: undefined, limit: 1500 },
+      { kind: 'job-titles', query: undefined, limit: 1500, filter: undefined },
+      { kind: 'skills', query: undefined, limit: 1500, filter: undefined },
     ]);
   });
 
   it('keeps searched taxonomy requests bounded by default', async () => {
     await request(app).get('/api/v1/taxonomy/job-titles?q=manager');
-    expect(repository.calls.at(-1)).toEqual({ kind: 'job-titles', query: 'manager', limit: 50 });
+    expect(repository.calls.at(-1)).toEqual({ kind: 'job-titles', query: 'manager', limit: 50, filter: undefined });
+  });
+
+  it('passes specialization and selected-role filters to the repository', async () => {
+    const subcategoryId = '22222222-2222-4222-8222-222222222222';
+    const roleId = '33333333-3333-4333-8333-333333333333';
+
+    expect((await request(app).get(`/api/v1/taxonomy/job-titles?subcategoryId=${subcategoryId}`)).status).toBe(200);
+    expect((await request(app).get(`/api/v1/taxonomy/skills?jobTitleIds=${roleId}`)).status).toBe(200);
+    expect(repository.calls.slice(-2)).toEqual([
+      { kind: 'job-titles', query: undefined, limit: 1500, filter: subcategoryId },
+      { kind: 'skills', query: undefined, limit: 1500, filter: [roleId] },
+    ]);
   });
 });
