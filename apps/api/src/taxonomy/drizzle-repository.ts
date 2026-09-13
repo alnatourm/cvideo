@@ -1,6 +1,6 @@
-import { and, asc, eq, ilike, or } from 'drizzle-orm';
+import { and, asc, eq, exists, ilike, or } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
-import { categories, jobTitles, languages, skills, subcategories } from '../db/schema.js';
+import { categories, jobTitleAliases, jobTitles, languages, skills, subcategories } from '../db/schema.js';
 import type { TaxonomyItem, TaxonomyRepository } from './repository.js';
 
 function mapItem(row: { id: string; code: string; nameEn: string; nameAr: string }): TaxonomyItem {
@@ -15,7 +15,7 @@ export class DrizzleTaxonomyRepository implements TaxonomyRepository {
       .select({ id: categories.id, code: categories.code, nameEn: categories.nameEn, nameAr: categories.nameAr })
       .from(categories)
       .where(eq(categories.isActive, true))
-      .orderBy(asc(categories.nameEn));
+      .orderBy(asc(categories.displayOrder), asc(categories.nameEn));
     return rows.map(mapItem);
   }
 
@@ -29,7 +29,7 @@ export class DrizzleTaxonomyRepository implements TaxonomyRepository {
       })
       .from(subcategories)
       .where(and(eq(subcategories.categoryId, categoryId), eq(subcategories.isActive, true)))
-      .orderBy(asc(subcategories.nameEn));
+      .orderBy(asc(subcategories.displayOrder), asc(subcategories.nameEn));
     return rows.map(mapItem);
   }
 
@@ -37,7 +37,21 @@ export class DrizzleTaxonomyRepository implements TaxonomyRepository {
     const condition = query
       ? and(
           eq(jobTitles.isActive, true),
-          or(ilike(jobTitles.nameEn, `%${query}%`), ilike(jobTitles.nameAr, `%${query}%`), ilike(jobTitles.code, `%${query}%`)),
+          or(
+            ilike(jobTitles.nameEn, `%${query}%`),
+            ilike(jobTitles.nameAr, `%${query}%`),
+            ilike(jobTitles.code, `%${query}%`),
+            exists(
+              this.db
+                .select({ id: jobTitleAliases.id })
+                .from(jobTitleAliases)
+                .where(and(
+                  eq(jobTitleAliases.jobTitleId, jobTitles.id),
+                  eq(jobTitleAliases.isActive, true),
+                  or(ilike(jobTitleAliases.aliasEn, `%${query}%`), ilike(jobTitleAliases.aliasAr, `%${query}%`)),
+                )),
+            ),
+          ),
         )
       : eq(jobTitles.isActive, true);
     const rows = await this.db

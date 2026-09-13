@@ -7,7 +7,7 @@ const searchSchema = z.object({
     (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
     z.string().trim().min(1).max(120).optional(),
   ),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(1500).optional(),
 });
 
 export class TaxonomyService {
@@ -23,12 +23,12 @@ export class TaxonomyService {
 
   listJobTitles(input: unknown) {
     const value = searchSchema.parse(input);
-    return this.repository.listJobTitles(value.q, value.limit);
+    return this.repository.listJobTitles(value.q, value.limit ?? (value.q ? 50 : 1500));
   }
 
   listSkills(input: unknown) {
     const value = searchSchema.parse(input);
-    return this.repository.listSkills(value.q, value.limit);
+    return this.repository.listSkills(value.q, value.limit ?? (value.q ? 50 : 1500));
   }
 
   listLanguages() {
