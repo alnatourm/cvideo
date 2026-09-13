@@ -53,7 +53,7 @@ jobs:
         run: |
           pnpm --filter @cvideo/api db:migrate
           pnpm --filter @cvideo/api db:migrate
-          psql "$DATABASE_URL" -Atc "select count(*) from cvideo_schema_migrations;" | grep -qx 8
+          psql "$DATABASE_URL" -Atc "select count(*) from cvideo_schema_migrations;" | grep -qx 17
       - name: Verify migrated schema and security relationships
         run: |
           psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_profiles');" | grep -qx candidate_profiles
