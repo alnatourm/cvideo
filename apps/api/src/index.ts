@@ -69,6 +69,7 @@ const app = createApp({
   messagingService,
   savedListsService,
   taxonomyService,
+  trustProxyHops: process.env.NODE_ENV === 'production' ? 1 : undefined,
   webDistDirectory: serveWeb ? webDistDirectory : undefined,
 });
 

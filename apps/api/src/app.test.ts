@@ -18,6 +18,11 @@ describe('CVIDEO API foundation', () => {
     expect(response.body.error.code).toBe('NOT_FOUND');
   });
 
+  it('uses an explicit proxy-hop count when deployed behind a trusted ingress', () => {
+    const app = createApp({ trustProxyHops: 1 });
+    expect(app.get('trust proxy')).toBe(1);
+  });
+
   it('serves the web shell for client-side routes without masking API 404s', async () => {
     const webDirectory = await mkdtemp(join(tmpdir(), 'cvideo-web-'));
     await writeFile(join(webDirectory, 'index.html'), '<!doctype html><title>CVIDEO shell</title>');

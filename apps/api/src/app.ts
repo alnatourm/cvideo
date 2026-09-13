@@ -49,6 +49,7 @@ export interface AppOptions {
   savedListsService?: SavedListsService;
   taxonomyService?: TaxonomyService;
   secureCookies?: boolean;
+  trustProxyHops?: number;
   webDistDirectory?: string;
 }
 
@@ -56,6 +57,7 @@ export function createApp(options: AppOptions = {}) {
   const app = express();
 
   app.disable('x-powered-by');
+  if (options.trustProxyHops !== undefined) app.set('trust proxy', options.trustProxyHops);
   app.use(helmet());
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());

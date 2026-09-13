@@ -22,6 +22,8 @@ The existing standalone web and mobile Railway services are temporary. Do not de
 5. Leave `VITE_API_BASE_URL` empty so the web application uses same-origin `/api` requests.
 6. Keep Bunny Stream variables unset until all three approved provider values are available.
 
+The production API trusts exactly one proxy hop for Railway's ingress. Do not change this to an unrestricted `trust proxy=true` setting.
+
 On each deploy, Railway runs `pnpm --filter @cvideo/api db:migrate` before starting the service. A failed or changed migration blocks deployment. Railway checks `/api/v1/health` before considering the deployment healthy.
 
 ## Private CV document storage
