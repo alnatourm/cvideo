@@ -20,7 +20,7 @@ The existing standalone web and mobile Railway services are temporary. Do not de
 3. Configure `DATABASE_URL` as a Railway reference to the PostgreSQL service's `DATABASE_URL`; do not paste or commit the resolved credential.
 4. Set `NODE_ENV=production`.
 5. Leave `VITE_API_BASE_URL` empty so the web application uses same-origin `/api` requests.
-6. Keep Bunny Stream variables unset until all three approved provider values are available.
+6. Configure all three Bunny Stream variables together before testing video upload.
 
 The production API trusts exactly one proxy hop for Railway's ingress. Do not change this to an unrestricted `trust proxy=true` setting.
 
@@ -42,6 +42,7 @@ Never mount private documents inside `apps/web/dist` or expose the volume as a s
 - [ ] Deployment pre-deploy logs show migrations `0001` through `0018` as applied or current, including recruitment taxonomy and languages.
 - [ ] Candidate roles are filtered by specialization and skills are filtered by selected roles.
 - [ ] MP4/MOV metadata fallback accepts a browser-unsupported codec while preserving the 30-second/720p checks.
+- [ ] Bunny status `3` or playable-resolution status `4` moves an uploaded video from processing to ready.
 - [ ] `GET /api/v1/health` returns HTTP 200 and `{"status":"ok","service":"cvideo-api","version":"v1"}`.
 - [ ] Opening the unified public URL returns the CVIDEO web shell.
 - [ ] Refreshing a nested browser route returns the web shell rather than a 404.
