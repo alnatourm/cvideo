@@ -6,6 +6,52 @@ import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 
 const migrationPattern = /^\d{4}_.+\.sql$/;
+const connectionRetryDelaysMs = [1_000, 2_000, 4_000, 8_000, 10_000];
+
+function errorCodes(error: unknown): string[] {
+  if (typeof error !== 'object' || error === null) return [];
+  const record = error as Record<string, unknown>;
+  const ownCode = typeof record.code === 'string' ? [record.code] : [];
+  const nestedCodes = Array.isArray(record.errors) ? record.errors.flatMap(errorCodes) : [];
+  return [...ownCode, ...nestedCodes];
+}
+
+function isRetryableConnectionError(error: unknown) {
+  const retryableCodes = new Set([
+    'ECONNREFUSED',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'EAI_AGAIN',
+    '57P03', // PostgreSQL is starting up or cannot accept connections yet.
+    '53300', // PostgreSQL has temporarily exhausted connection slots.
+  ]);
+  return errorCodes(error).some((code) => retryableCodes.has(code));
+}
+
+async function wait(delayMs: number) {
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function waitForDatabase(client: ReturnType<typeof postgres>) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await client`select 1`;
+      return;
+    } catch (error) {
+      const delayMs = connectionRetryDelaysMs[attempt];
+      if (delayMs === undefined || !isRetryableConnectionError(error)) throw error;
+      console.warn(JSON.stringify({
+        level: 'warn',
+        service: 'cvideo-migrate',
+        event: 'database_connection_retry',
+        attempt: attempt + 1,
+        delayMs,
+        errorCodes: errorCodes(error),
+      }));
+      await wait(delayMs);
+    }
+  }
+}
 
 function findMigrationsDirectory() {
   const configuredDirectory = process.env.CVIDEO_MIGRATIONS_DIR?.trim();
@@ -34,6 +80,7 @@ async function migrate() {
 
   const client = postgres(databaseUrl, { max: 1 });
   try {
+    await waitForDatabase(client);
     await client`
       create table if not exists cvideo_schema_migrations (
         filename text primary key,
