@@ -58,7 +58,7 @@ class MemoryCandidateRepository implements CandidateRepository {
   private profile: CandidateOwnProfile = {
     id: 'profile-1', displayName: 'Candidate One', headline: null, profilePhotoUrl: null,
     countryCode: 'JO', city: 'Amman', primaryCategoryId: null, primarySubcategoryId: null,
-    yearsExperience: 0, professionalSummary: null, cvOriginalFilename: null,
+    yearsExperience: 0, certificateCount: 0, highestEducationLevel: 'none', professionalSummary: null, cvOriginalFilename: null,
     extraSubfieldIds: [], preferredRoleIds: [], skillIds: [], languageIds: [],
     experience: [], education: [], certificates: [], video: null,
   };
@@ -104,11 +104,25 @@ describe('protected candidate API', () => {
     const update = await request(app).put('/api/v1/candidate/profile').set('authorization', `Bearer ${token}`).send({
       displayName: 'Updated Candidate', headline: 'Sales Manager', countryCode: 'jo', city: 'Amman',
       extraSubfieldIds: [], preferredRoleIds: [], skillIds: [], languageIds: [], yearsExperience: 7,
+      certificateCount: 3, highestEducationLevel: 'bachelor',
       professionalSummary: 'Professional profile summary',
     });
     expect(update.status).toBe(200);
     expect(update.body.data.displayName).toBe('Updated Candidate');
+    expect(update.body.data.certificateCount).toBe(3);
+    expect(update.body.data.highestEducationLevel).toBe('bachelor');
     expect(candidateRepo.lastUserId).toBe(userId);
+  });
+
+  it('rejects invalid fast-profile numeric values', async () => {
+    const auth = new AuthService(new MemoryAuthRepository());
+    const app = createApp({ authService: auth, candidateService: new CandidateService(new MemoryCandidateRepository()), secureCookies: false });
+    const { token } = await candidateToken(app);
+    const base = { displayName: 'Candidate One', countryCode: 'JO', city: 'Amman', extraSubfieldIds: [], preferredRoleIds: [], skillIds: [], languageIds: [], highestEducationLevel: 'master' };
+    for (const invalid of [{ yearsExperience: 51, certificateCount: 0 }, { yearsExperience: 2.5, certificateCount: 0 }, { yearsExperience: 2, certificateCount: -1 }]) {
+      const response = await request(app).put('/api/v1/candidate/profile').set('authorization', `Bearer ${token}`).send({ ...base, ...invalid });
+      expect(response.status).toBe(400);
+    }
   });
 
   it('blocks company members from candidate-owned routes', async () => {

@@ -116,6 +116,8 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
         countryCode: candidateProfiles.countryCode,
         city: candidateProfiles.city,
         yearsExperience: candidateProfiles.yearsExperience,
+        certificateCount: candidateProfiles.certificateCount,
+        highestEducationLevel: candidateProfiles.highestEducationLevel,
         primaryCategoryId: candidateProfiles.primaryCategoryId,
         primarySubcategoryId: candidateProfiles.primarySubcategoryId,
         introductionVideoId: candidateVideos.id,
@@ -131,7 +133,10 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
       .limit(filters.pageSize + 1);
 
     const hasMore = rows.length > filters.pageSize;
-    const items = rows.slice(0, filters.pageSize);
+    const items = rows.slice(0, filters.pageSize).map((row) => ({
+      ...row,
+      highestEducationLevel: row.highestEducationLevel as RecruiterCandidateDetail['highestEducationLevel'],
+    }));
     return { items, nextCursor: hasMore ? items.at(-1)?.id ?? null : null };
   }
 
@@ -144,6 +149,8 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
         countryCode: candidateProfiles.countryCode,
         city: candidateProfiles.city,
         yearsExperience: candidateProfiles.yearsExperience,
+        certificateCount: candidateProfiles.certificateCount,
+        highestEducationLevel: candidateProfiles.highestEducationLevel,
         primaryCategoryId: candidateProfiles.primaryCategoryId,
         primarySubcategoryId: candidateProfiles.primarySubcategoryId,
         professionalSummary: candidateProfiles.professionalSummary,
@@ -181,6 +188,7 @@ export class DrizzleDiscoveryRepository implements DiscoveryRepository {
 
     return {
       ...profile,
+      highestEducationLevel: profile.highestEducationLevel as RecruiterCandidateDetail['highestEducationLevel'],
       preferredRoleIds: preferredRoles.map((row) => row.id),
       skillIds: skills.map((row) => row.id),
       languageIds: languages.map((row) => row.id),

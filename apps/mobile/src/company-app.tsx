@@ -35,6 +35,20 @@ function errorMessage(locale: Locale, err: unknown) {
   return err instanceof ApiError || err instanceof Error ? err.message : tx(locale, 'Something went wrong', 'حدث خطأ غير متوقع');
 }
 
+function educationLabel(value: CandidateDetail['highestEducationLevel'], locale: Locale) {
+  const labels: Record<CandidateDetail['highestEducationLevel'], [string, string]> = {
+    none: ['No formal education', 'بدون مؤهل'],
+    high_school: ['High school', 'الثانوية العامة'],
+    vocational: ['Vocational or technical', 'مهني أو تقني'],
+    diploma: ['Diploma', 'دبلوم'],
+    bachelor: ["Bachelor's", 'بكالوريوس'],
+    master: ["Master's", 'ماجستير'],
+    doctorate: ['Doctorate (PhD)', 'دكتوراه'],
+    professor: ['Professor or academic rank', 'أستاذ جامعي'],
+  };
+  return locale === 'ar' ? labels[value][1] : labels[value][0];
+}
+
 export function CompanyApp({
   principal,
   locale,
@@ -216,7 +230,7 @@ export function CompanyApp({
                   <Text style={[styles.candidateHeadline, rtl && styles.rtl]}>{selected.headline || tx(locale, 'Professional candidate', 'مرشح مهني')}</Text>
                   <Text style={[styles.meta, rtl && styles.rtl]}>{selected.city}, {selected.countryCode} · {selected.yearsExperience} {tx(locale, 'years experience', 'سنوات خبرة')}</Text>
                   {selected.professionalSummary ? <Text style={[styles.summary, rtl && styles.rtl]}>{selected.professionalSummary}</Text> : null}
-                  <View style={styles.metrics}><Metric locale={locale} label={tx(locale, 'Skills', 'مهارات')} value={String(selected.skillIds.length)} /><Metric locale={locale} label={tx(locale, 'Certificates', 'شهادات')} value={String(selected.certificates.length)} /><Metric locale={locale} label={tx(locale, 'Roles', 'خبرات')} value={String(selected.experience.length)} /></View>
+                  <View style={styles.metrics}><Metric locale={locale} label={tx(locale, 'Skills', 'مهارات')} value={String(selected.skillIds.length)} /><Metric locale={locale} label={tx(locale, 'Certificates', 'شهادات')} value={String(selected.certificateCount)} /><Metric locale={locale} label={tx(locale, 'Highest education', 'أعلى مؤهل')} value={educationLabel(selected.highestEducationLevel, locale)} /></View>
                   <View style={styles.actionStack}><SecondaryButton label={busy === 'save' ? tx(locale, 'Saving…', 'جاري الحفظ…') : tx(locale, 'Save candidate', 'حفظ المرشح')} onPress={() => void saveCandidate()} disabled={busy === 'save'} /><SecondaryButton label={busy === 'chat' ? tx(locale, 'Opening…', 'جاري الفتح…') : tx(locale, 'Start chat', 'بدء محادثة')} onPress={() => void startChat()} disabled={busy === 'chat'} /><PrimaryButton label={tx(locale, 'Request interview', 'طلب مقابلة')} onPress={() => { setInterviewTitle(selected.headline ?? ''); setShowInterview((value) => !value); }} /></View>
                 </Card>
                 {showInterview ? <Card><Text style={[styles.cardTitle, rtl && styles.rtl]}>{tx(locale, 'Interview request', 'طلب مقابلة')}</Text><Field locale={locale} label={tx(locale, 'Role / opportunity', 'المسمى / الفرصة')} value={interviewTitle} onChangeText={setInterviewTitle} /><View style={styles.twoCol}><View style={styles.flex}><Field locale={locale} label={tx(locale, 'Date YYYY-MM-DD', 'التاريخ YYYY-MM-DD')} value={interviewDate} onChangeText={setInterviewDate} placeholder="2026-09-15" /></View><View style={styles.flex}><Field locale={locale} label={tx(locale, 'Time HH:mm', 'الوقت HH:mm')} value={interviewTime} onChangeText={setInterviewTime} placeholder="14:30" /></View></View><Text style={[styles.sectionLabel, rtl && styles.rtl]}>{tx(locale, 'Interview type', 'نوع المقابلة')}</Text><View style={styles.typeRow}>{(['google_meet','video_call','in_person'] as const).map((type) => <Pressable key={type} style={[styles.typeChip, meetingType === type && styles.typeActive]} onPress={() => setMeetingType(type)}><Text style={[styles.typeText, meetingType === type && styles.typeTextActive]}>{type.replaceAll('_',' ')}</Text></Pressable>)}</View>{meetingType === 'in_person' ? <Field locale={locale} label={tx(locale, 'Location', 'الموقع')} value={location} onChangeText={setLocation} /> : null}<Field locale={locale} label={tx(locale, 'Message', 'رسالة')} value={interviewMessage} onChangeText={setInterviewMessage} multiline /><PrimaryButton label={busy === 'interview' ? tx(locale, 'Sending…', 'جاري الإرسال…') : tx(locale, 'Send interview request', 'إرسال طلب المقابلة')} onPress={() => void requestInterview()} disabled={busy === 'interview'} /></Card> : null}

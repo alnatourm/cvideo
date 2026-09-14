@@ -53,7 +53,7 @@ jobs:
         run: |
           pnpm --filter @cvideo/api db:migrate
           pnpm --filter @cvideo/api db:migrate
-          psql "$DATABASE_URL" -Atc "select count(*) from cvideo_schema_migrations;" | grep -qx 19
+          psql "$DATABASE_URL" -Atc "select count(*) from cvideo_schema_migrations;" | grep -qx 20
       - name: Verify migrated schema and security relationships
         run: |
           psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_profiles');" | grep -qx candidate_profiles
@@ -76,6 +76,8 @@ jobs:
           psql "$DATABASE_URL" -Atc "select count(*) from pg_indexes where indexname = 'conversations_company_candidate_unique' and indexdef ilike 'CREATE UNIQUE INDEX%';" | grep -qx 1
           psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conrelid = 'public.interviews'::regclass and contype in ('c','f');" | grep -qE '^[4-9][0-9]*$'
           psql "$DATABASE_URL" -Atc "select count(*) from information_schema.columns where table_name = 'companies' and column_name = 'operational_status';" | grep -qx 1
+          psql "$DATABASE_URL" -Atc "select count(*) from information_schema.columns where table_name = 'candidate_profiles' and column_name in ('certificate_count', 'highest_education_level');" | grep -qx 2
+          psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conname in ('candidate_profiles_certificate_count_check', 'candidate_profiles_highest_education_check');" | grep -qx 2
           psql "$DATABASE_URL" -Atc "select count(*) from categories where code like 'F___';" | grep -qx 50
           psql "$DATABASE_URL" -Atc "select count(*) from subcategories where code like 'SF____';" | grep -qx 238
           psql "$DATABASE_URL" -Atc "select count(*) from job_titles where code like 'JT_____';" | grep -qx 1016

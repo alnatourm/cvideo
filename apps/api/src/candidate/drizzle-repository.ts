@@ -133,6 +133,8 @@ export class DrizzleCandidateRepository implements CandidateRepository {
       primaryCategoryId: profile.primaryCategoryId,
       primarySubcategoryId: profile.primarySubcategoryId,
       yearsExperience: profile.yearsExperience,
+      certificateCount: profile.certificateCount,
+      highestEducationLevel: profile.highestEducationLevel as CandidateOwnProfile['highestEducationLevel'],
       professionalSummary: profile.professionalSummary,
       cvOriginalFilename: profile.cvOriginalFilename,
       extraSubfieldIds: extraRows.map((row) => row.id),
@@ -166,6 +168,8 @@ export class DrizzleCandidateRepository implements CandidateRepository {
           primaryCategoryId: input.primaryCategoryId ?? null,
           primarySubcategoryId: input.primarySubcategoryId ?? null,
           yearsExperience: input.yearsExperience,
+          certificateCount: input.certificateCount,
+          highestEducationLevel: input.highestEducationLevel,
           professionalSummary: input.professionalSummary ?? null,
           updatedAt: new Date(),
         })

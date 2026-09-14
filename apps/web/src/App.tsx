@@ -39,6 +39,21 @@ import { useAuth } from './auth';
 import { direction, landingFlowSteps, type Locale, t } from './i18n';
 
 const companyRoles: EffectiveRole[] = ['company_owner', 'company_admin', 'recruiter'];
+const educationLevels: Array<{ value: CandidateProfile['highestEducationLevel']; en: string; ar: string }> = [
+  { value: 'none', en: 'No formal education', ar: 'بدون مؤهل' },
+  { value: 'high_school', en: 'High school', ar: 'الثانوية العامة' },
+  { value: 'vocational', en: 'Vocational or technical', ar: 'مهني أو تقني' },
+  { value: 'diploma', en: 'Diploma', ar: 'دبلوم' },
+  { value: 'bachelor', en: "Bachelor's", ar: 'بكالوريوس' },
+  { value: 'master', en: "Master's", ar: 'ماجستير' },
+  { value: 'doctorate', en: 'Doctorate (PhD)', ar: 'دكتوراه' },
+  { value: 'professor', en: 'Professor or academic rank', ar: 'أستاذ جامعي' },
+];
+
+function educationLabel(locale: Locale, value: CandidateProfile['highestEducationLevel']) {
+  const item = educationLevels.find((level) => level.value === value) ?? educationLevels[0]!;
+  return locale === 'ar' ? item.ar : item.en;
+}
 
 function text(locale: Locale, en: string, ar: string) {
   return locale === 'ar' ? ar : en;
@@ -437,9 +452,6 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
-  const [experienceDraft, setExperienceDraft] = useState({ companyName: '', jobTitle: '', location: '', startDate: '', endDate: '', isCurrent: false, description: '' });
-  const [educationDraft, setEducationDraft] = useState({ institution: '', qualification: '', fieldOfStudy: '', startDate: '', endDate: '', description: '' });
-  const [certificateDraft, setCertificateDraft] = useState({ name: '', issuingOrganization: '', issueDate: '', expiryDate: '', credentialUrl: '' });
 
   async function load() {
     try {
@@ -501,6 +513,8 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
         skillIds: profile.skillIds,
         languageIds: profile.languageIds,
         yearsExperience: profile.yearsExperience,
+        certificateCount: profile.certificateCount,
+        highestEducationLevel: profile.highestEducationLevel,
         professionalSummary: profile.professionalSummary,
       });
       setProfile(updated); setNotice(text(locale, 'Profile saved.', 'تم حفظ الملف.'));
@@ -509,81 +523,6 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
 
   function multiValues(event: React.ChangeEvent<HTMLSelectElement>) {
     return Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
-  }
-
-  async function addExperience() {
-    if (!profile) return;
-    if (!experienceDraft.companyName.trim() || !experienceDraft.jobTitle.trim() || !experienceDraft.startDate) {
-      setError(text(locale, 'Company, job title, and start date are required.', 'الشركة والمسمى الوظيفي وتاريخ البدء مطلوبة.'));
-      return;
-    }
-    setBusy('experience'); setError(''); setNotice('');
-    try {
-      const created = await api.createCandidateExperience({
-        companyName: experienceDraft.companyName.trim(), jobTitle: experienceDraft.jobTitle.trim(),
-        location: experienceDraft.location.trim() || null, startDate: experienceDraft.startDate,
-        endDate: experienceDraft.isCurrent ? null : experienceDraft.endDate || null,
-        isCurrent: experienceDraft.isCurrent, description: experienceDraft.description.trim() || null,
-      });
-      setProfile({ ...profile, experience: [created, ...profile.experience] });
-      setExperienceDraft({ companyName: '', jobTitle: '', location: '', startDate: '', endDate: '', isCurrent: false, description: '' });
-      setNotice(text(locale, 'Experience added.', 'تمت إضافة الخبرة.'));
-    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
-  }
-
-  async function addEducation() {
-    if (!profile) return;
-    if (!educationDraft.institution.trim() || !educationDraft.qualification.trim()) {
-      setError(text(locale, 'Institution and qualification are required.', 'المؤسسة والمؤهل مطلوبان.'));
-      return;
-    }
-    setBusy('education'); setError(''); setNotice('');
-    try {
-      const created = await api.createCandidateEducation({
-        institution: educationDraft.institution.trim(), qualification: educationDraft.qualification.trim(),
-        fieldOfStudy: educationDraft.fieldOfStudy.trim() || null, startDate: educationDraft.startDate || null,
-        endDate: educationDraft.endDate || null, description: educationDraft.description.trim() || null,
-      });
-      setProfile({ ...profile, education: [created, ...profile.education] });
-      setEducationDraft({ institution: '', qualification: '', fieldOfStudy: '', startDate: '', endDate: '', description: '' });
-      setNotice(text(locale, 'Education added.', 'تمت إضافة التعليم.'));
-    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
-  }
-
-  async function addCertificate() {
-    if (!profile) return;
-    if (!certificateDraft.name.trim() || !certificateDraft.issuingOrganization.trim()) {
-      setError(text(locale, 'Certificate name and issuing organization are required.', 'اسم الشهادة والجهة المانحة مطلوبان.'));
-      return;
-    }
-    setBusy('certificate'); setError(''); setNotice('');
-    try {
-      const created = await api.createCandidateCertificate({
-        name: certificateDraft.name.trim(), issuingOrganization: certificateDraft.issuingOrganization.trim(),
-        issueDate: certificateDraft.issueDate || null, expiryDate: certificateDraft.expiryDate || null,
-        credentialId: null, credentialUrl: certificateDraft.credentialUrl.trim() || null,
-      });
-      setProfile({ ...profile, certificates: [created, ...profile.certificates] });
-      setCertificateDraft({ name: '', issuingOrganization: '', issueDate: '', expiryDate: '', credentialUrl: '' });
-      setNotice(text(locale, 'Certificate added.', 'تمت إضافة الشهادة.'));
-    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
-  }
-
-  async function removeEvidence(kind: 'experience' | 'education' | 'certificate', id: string) {
-    if (!profile || !window.confirm(text(locale, 'Remove this record?', 'حذف هذا السجل؟'))) return;
-    setBusy(`${kind}-${id}`); setError(''); setNotice('');
-    try {
-      if (kind === 'experience') await api.deleteCandidateExperience(id);
-      if (kind === 'education') await api.deleteCandidateEducation(id);
-      if (kind === 'certificate') await api.deleteCandidateCertificate(id);
-      setProfile({
-        ...profile,
-        experience: kind === 'experience' ? profile.experience.filter((item) => item.id !== id) : profile.experience,
-        education: kind === 'education' ? profile.education.filter((item) => item.id !== id) : profile.education,
-        certificates: kind === 'certificate' ? profile.certificates.filter((item) => item.id !== id) : profile.certificates,
-      });
-      setNotice(text(locale, 'Record removed.', 'تم حذف السجل.'));
-    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
   }
 
   async function uploadVideo(file: File) {
@@ -660,57 +599,14 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
           <label>{text(locale, 'City', 'المدينة')}<input value={profile.city} onChange={(e) => setProfile({ ...profile, city: e.target.value })} /></label>
           <label>{text(locale, 'Main field', 'المجال الرئيسي')}<select value={profile.primaryCategoryId ?? ''} onChange={(e) => void changeCategory(e.target.value)}><option value="">{text(locale, 'Select field', 'اختر المجال')}</option>{categories.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Specialization', 'التخصص')}<select value={profile.primarySubcategoryId ?? ''} onChange={(e) => void changeSubcategory(e.target.value)}><option value="">{text(locale, 'Select specialization', 'اختر التخصص')}</option>{subcategories.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
-          <label>{text(locale, 'Years of experience', 'سنوات الخبرة')}<input type="number" min={0} max={80} value={profile.yearsExperience} onChange={(e) => setProfile({ ...profile, yearsExperience: Number(e.target.value) })} /></label>
+          <label>{text(locale, 'Years of experience', 'سنوات الخبرة')}<input type="number" min={0} max={50} step={1} value={profile.yearsExperience} onChange={(e) => setProfile({ ...profile, yearsExperience: Number(e.target.value) })} /></label>
+          <label>{text(locale, 'Certificates', 'عدد الشهادات')}<input type="number" min={0} max={50} step={1} value={profile.certificateCount} onChange={(e) => setProfile({ ...profile, certificateCount: Number(e.target.value) })} /></label>
+          <label>{text(locale, 'Highest education', 'أعلى مؤهل تعليمي')}<select value={profile.highestEducationLevel} onChange={(e) => setProfile({ ...profile, highestEducationLevel: e.target.value as CandidateProfile['highestEducationLevel'] })}>{educationLevels.map((item) => <option key={item.value} value={item.value}>{locale === 'ar' ? item.ar : item.en}</option>)}</select></label>
           <label>{text(locale, 'Preferred roles (up to 5)', 'الأدوار المفضلة (حتى 5)')}<select multiple value={profile.preferredRoleIds} onChange={(e) => void changeRoles(multiValues(e))}>{roles.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Skills', 'المهارات')}<select multiple value={profile.skillIds} onChange={(e) => setProfile({ ...profile, skillIds: multiValues(e).slice(0, 50) })}>{skills.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Languages', 'اللغات')}<select multiple value={profile.languageIds} onChange={(e) => setProfile({ ...profile, languageIds: multiValues(e).slice(0, 20) })}>{languages.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label className="span-two">{text(locale, 'Professional summary', 'الملخص المهني')}<textarea rows={5} value={profile.professionalSummary ?? ''} onChange={(e) => setProfile({ ...profile, professionalSummary: e.target.value || null })} /></label>
 
-          <section className="span-two evidence-editor">
-            <div><span className="eyebrow">{text(locale, 'Professional evidence', 'التفاصيل المهنية')}</span><h2>{text(locale, 'Experience, education and certificates', 'الخبرة والتعليم والشهادات')}</h2><p className="muted">{text(locale, 'Add the records companies should see when they open your full profile.', 'أضف السجلات التي يجب أن تراها الشركات عند فتح ملفك الكامل.')}</p></div>
-
-            <details open>
-              <summary>{text(locale, `Experience (${profile.experience.length})`, `الخبرة (${profile.experience.length})`)}</summary>
-              <div className="evidence-records">{profile.experience.map((item) => <article key={item.id}><div><strong>{item.jobTitle}</strong><span>{item.companyName}{item.location ? ` · ${item.location}` : ''}</span><small>{item.startDate} — {item.isCurrent ? text(locale, 'Present', 'حتى الآن') : item.endDate ?? text(locale, 'Not specified', 'غير محدد')}</small></div><button type="button" className="ghost small" disabled={busy === `experience-${item.id}`} onClick={() => void removeEvidence('experience', item.id)}>{text(locale, 'Remove', 'حذف')}</button></article>)}</div>
-              <div className="form-grid two evidence-form">
-                <label>{text(locale, 'Job title', 'المسمى الوظيفي')}<input value={experienceDraft.jobTitle} onChange={(e) => setExperienceDraft({ ...experienceDraft, jobTitle: e.target.value })} /></label>
-                <label>{text(locale, 'Company', 'الشركة')}<input value={experienceDraft.companyName} onChange={(e) => setExperienceDraft({ ...experienceDraft, companyName: e.target.value })} /></label>
-                <label>{text(locale, 'Location', 'الموقع')}<input value={experienceDraft.location} onChange={(e) => setExperienceDraft({ ...experienceDraft, location: e.target.value })} /></label>
-                <label>{text(locale, 'Start date', 'تاريخ البدء')}<input type="date" value={experienceDraft.startDate} onChange={(e) => setExperienceDraft({ ...experienceDraft, startDate: e.target.value })} /></label>
-                <label>{text(locale, 'End date', 'تاريخ الانتهاء')}<input type="date" disabled={experienceDraft.isCurrent} value={experienceDraft.endDate} onChange={(e) => setExperienceDraft({ ...experienceDraft, endDate: e.target.value })} /></label>
-                <label className="check-field"><input type="checkbox" checked={experienceDraft.isCurrent} onChange={(e) => setExperienceDraft({ ...experienceDraft, isCurrent: e.target.checked, endDate: e.target.checked ? '' : experienceDraft.endDate })} />{text(locale, 'Current role', 'العمل الحالي')}</label>
-                <label className="span-two">{text(locale, 'Description', 'الوصف')}<textarea rows={3} value={experienceDraft.description} onChange={(e) => setExperienceDraft({ ...experienceDraft, description: e.target.value })} /></label>
-                <button type="button" className="button secondary span-two" disabled={busy === 'experience'} onClick={() => void addExperience()}>{text(locale, 'Add experience', 'إضافة خبرة')}</button>
-              </div>
-            </details>
-
-            <details>
-              <summary>{text(locale, `Education (${profile.education.length})`, `التعليم (${profile.education.length})`)}</summary>
-              <div className="evidence-records">{profile.education.map((item) => <article key={item.id}><div><strong>{item.qualification}</strong><span>{item.institution}{item.fieldOfStudy ? ` · ${item.fieldOfStudy}` : ''}</span></div><button type="button" className="ghost small" disabled={busy === `education-${item.id}`} onClick={() => void removeEvidence('education', item.id)}>{text(locale, 'Remove', 'حذف')}</button></article>)}</div>
-              <div className="form-grid two evidence-form">
-                <label>{text(locale, 'Institution', 'المؤسسة التعليمية')}<input value={educationDraft.institution} onChange={(e) => setEducationDraft({ ...educationDraft, institution: e.target.value })} /></label>
-                <label>{text(locale, 'Qualification', 'المؤهل')}<input value={educationDraft.qualification} onChange={(e) => setEducationDraft({ ...educationDraft, qualification: e.target.value })} /></label>
-                <label>{text(locale, 'Field of study', 'مجال الدراسة')}<input value={educationDraft.fieldOfStudy} onChange={(e) => setEducationDraft({ ...educationDraft, fieldOfStudy: e.target.value })} /></label>
-                <label>{text(locale, 'Start date', 'تاريخ البدء')}<input type="date" value={educationDraft.startDate} onChange={(e) => setEducationDraft({ ...educationDraft, startDate: e.target.value })} /></label>
-                <label>{text(locale, 'End date', 'تاريخ الانتهاء')}<input type="date" value={educationDraft.endDate} onChange={(e) => setEducationDraft({ ...educationDraft, endDate: e.target.value })} /></label>
-                <label className="span-two">{text(locale, 'Description', 'الوصف')}<textarea rows={3} value={educationDraft.description} onChange={(e) => setEducationDraft({ ...educationDraft, description: e.target.value })} /></label>
-                <button type="button" className="button secondary span-two" disabled={busy === 'education'} onClick={() => void addEducation()}>{text(locale, 'Add education', 'إضافة تعليم')}</button>
-              </div>
-            </details>
-
-            <details>
-              <summary>{text(locale, `Certificates (${profile.certificates.length})`, `الشهادات (${profile.certificates.length})`)}</summary>
-              <div className="evidence-records">{profile.certificates.map((item) => <article key={item.id}><div><strong>{item.name}</strong><span>{item.issuingOrganization}</span></div><button type="button" className="ghost small" disabled={busy === `certificate-${item.id}`} onClick={() => void removeEvidence('certificate', item.id)}>{text(locale, 'Remove', 'حذف')}</button></article>)}</div>
-              <div className="form-grid two evidence-form">
-                <label>{text(locale, 'Certificate name', 'اسم الشهادة')}<input value={certificateDraft.name} onChange={(e) => setCertificateDraft({ ...certificateDraft, name: e.target.value })} /></label>
-                <label>{text(locale, 'Issuing organization', 'الجهة المانحة')}<input value={certificateDraft.issuingOrganization} onChange={(e) => setCertificateDraft({ ...certificateDraft, issuingOrganization: e.target.value })} /></label>
-                <label>{text(locale, 'Issue date', 'تاريخ الإصدار')}<input type="date" value={certificateDraft.issueDate} onChange={(e) => setCertificateDraft({ ...certificateDraft, issueDate: e.target.value })} /></label>
-                <label>{text(locale, 'Expiry date', 'تاريخ الانتهاء')}<input type="date" value={certificateDraft.expiryDate} onChange={(e) => setCertificateDraft({ ...certificateDraft, expiryDate: e.target.value })} /></label>
-                <label className="span-two">{text(locale, 'Credential URL (optional)', 'رابط الشهادة (اختياري)')}<input type="url" value={certificateDraft.credentialUrl} onChange={(e) => setCertificateDraft({ ...certificateDraft, credentialUrl: e.target.value })} /></label>
-                <button type="button" className="button secondary span-two" disabled={busy === 'certificate'} onClick={() => void addCertificate()}>{text(locale, 'Add certificate', 'إضافة شهادة')}</button>
-              </div>
-            </details>
-          </section>
         </form>
 
         <aside className="panel video-manager">
@@ -853,18 +749,13 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
           {!selected ? <div className="empty-state tall">{text(locale, 'Candidate details appear here.', 'ستظهر تفاصيل المرشح هنا.')}</div> : <>
             <span className="eyebrow">{text(locale, 'Candidate', 'مرشح')}</span><h1>{selected.displayName}</h1><h3>{selected.headline || text(locale, 'Professional candidate', 'مرشح مهني')}</h3><p className="muted">{selected.city}, {selected.countryCode} · {selected.yearsExperience} {text(locale, 'years experience', 'سنوات خبرة')}</p>
             {selected.professionalSummary && <p className="candidate-summary">{selected.professionalSummary}</p>}
-            <div className="evidence-row"><span>{selected.skillIds.length} {text(locale, 'skills', 'مهارات')}</span><span>{selected.certificates.length} {text(locale, 'certificates', 'شهادات')}</span><span>{selected.experience.length} {text(locale, 'roles', 'خبرات')}</span></div>
+            <div className="evidence-row"><span>{selected.skillIds.length} {text(locale, 'skills', 'مهارات')}</span><span>{selected.certificateCount} {text(locale, 'certificates', 'شهادات')}</span><span>{educationLabel(locale, selected.highestEducationLevel)}</span></div>
             <div className="action-stack">
               <div className="save-list-controls"><select value={listId} onChange={(e) => { setListId(e.target.value); if (e.target.value) setNewListName(''); }}><option value="">{text(locale, 'Choose an existing list', 'اختر قائمة موجودة')}</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><span>{text(locale, 'or', 'أو')}</span><input value={newListName} disabled={Boolean(listId)} placeholder={text(locale, 'Enter a new list name', 'اكتب اسم قائمة جديدة')} onChange={(e) => setNewListName(e.target.value)} /><button className="button secondary" disabled={busy === 'save' || (!listId && !newListName.trim())} onClick={() => void saveCandidate()}>{text(locale, 'Save candidate', 'حفظ المرشح')}</button></div>
               <button className="button secondary full" disabled={busy === 'chat'} onClick={() => void startChat()}>{text(locale, 'Start Chat', 'بدء محادثة')}</button>
               {selected.cvOriginalFilename && <button className="button secondary full" disabled={busy === 'cv'} onClick={() => void downloadCandidateCv()}>{text(locale, 'Download CV', 'تنزيل السيرة الذاتية')}</button>}
               <button className="button primary full" onClick={() => { setInterviewForm((current) => ({ ...current, opportunityTitle: selected.headline || '' })); setShowInterview(true); }}>{t(locale, 'requestInterview')}</button>
             </div>
-            <details className="evidence-details"><summary>{text(locale, 'Open full professional evidence', 'عرض التفاصيل المهنية الكاملة')}</summary><div>
-              <section><h4>{text(locale, 'Experience', 'الخبرة')}</h4>{selected.experience.length ? selected.experience.map((item) => <article className="candidate-evidence-item" key={item.id}><strong>{item.jobTitle}</strong><span>{item.companyName}{item.location ? ` · ${item.location}` : ''}</span><small>{item.startDate} — {item.isCurrent ? text(locale, 'Present', 'حتى الآن') : item.endDate ?? text(locale, 'Not specified', 'غير محدد')}</small>{item.description && <p>{item.description}</p>}</article>) : <p className="muted">{text(locale, 'The candidate has not added experience yet.', 'لم يضف المرشح خبرات بعد.')}</p>}</section>
-              <section><h4>{text(locale, 'Education', 'التعليم')}</h4>{selected.education.length ? selected.education.map((item) => <article className="candidate-evidence-item" key={item.id}><strong>{item.qualification}</strong><span>{item.institution}{item.fieldOfStudy ? ` · ${item.fieldOfStudy}` : ''}</span>{(item.startDate || item.endDate) && <small>{item.startDate ?? ''} — {item.endDate ?? text(locale, 'Present', 'حتى الآن')}</small>}{item.description && <p>{item.description}</p>}</article>) : <p className="muted">{text(locale, 'The candidate has not added education yet.', 'لم يضف المرشح بيانات التعليم بعد.')}</p>}</section>
-              <section><h4>{text(locale, 'Certificates', 'الشهادات')}</h4>{selected.certificates.length ? selected.certificates.map((item) => <article className="candidate-evidence-item" key={item.id}><strong>{item.name}</strong><span>{item.issuingOrganization}</span>{item.issueDate && <small>{item.issueDate}</small>}{item.credentialUrl && <a href={item.credentialUrl} target="_blank" rel="noreferrer">{text(locale, 'View credential', 'عرض الشهادة')}</a>}</article>) : <p className="muted">{text(locale, 'The candidate has not added certificates yet.', 'لم يضف المرشح شهادات بعد.')}</p>}</section>
-            </div></details>
           </>}
         </aside>
       </div>

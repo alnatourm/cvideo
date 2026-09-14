@@ -185,6 +185,8 @@ export const candidateProfiles = pgTable(
       onDelete: 'set null',
     }),
     yearsExperience: integer('years_experience').notNull().default(0),
+    certificateCount: integer('certificate_count').notNull().default(0),
+    highestEducationLevel: varchar('highest_education_level', { length: 32 }).notNull().default('none'),
     professionalSummary: text('professional_summary'),
     cvStorageKey: text('cv_storage_key'),
     cvOriginalFilename: varchar('cv_original_filename', { length: 255 }),

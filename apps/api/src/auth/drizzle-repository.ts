@@ -75,6 +75,8 @@ export class DrizzleAuthRepository implements AuthRepository {
         countryCode: input.countryCode,
         city: input.city,
         yearsExperience: 0,
+        certificateCount: 0,
+        highestEducationLevel: 'none',
       });
 
       return mapUser(user);

@@ -15,6 +15,8 @@ describe('candidate profile validation', () => {
       countryCode: 'jo',
       city: 'Amman',
       yearsExperience: 5,
+      certificateCount: 2,
+      highestEducationLevel: 'bachelor',
     };
 
     expect(
@@ -46,9 +48,25 @@ describe('candidate profile validation', () => {
       countryCode: 'jo',
       city: 'Amman',
       yearsExperience: 0,
+      certificateCount: 0,
+      highestEducationLevel: 'none',
     });
 
     expect(result.countryCode).toBe('JO');
+  });
+
+  it('enforces fast-profile counts and canonical education values', () => {
+    const base = {
+      displayName: 'Candidate Name', countryCode: 'JO', city: 'Amman',
+      certificateCount: 2, highestEducationLevel: 'master',
+    };
+    expect(candidateProfileInputSchema.safeParse({ ...base, yearsExperience: -1 }).success).toBe(false);
+    expect(candidateProfileInputSchema.safeParse({ ...base, yearsExperience: 3.5 }).success).toBe(false);
+    expect(candidateProfileInputSchema.safeParse({ ...base, yearsExperience: 51 }).success).toBe(false);
+    expect(candidateProfileInputSchema.safeParse({ ...base, yearsExperience: 3, certificateCount: -1 }).success).toBe(false);
+    expect(candidateProfileInputSchema.safeParse({ ...base, yearsExperience: 3, certificateCount: 1.5 }).success).toBe(false);
+    expect(candidateProfileInputSchema.safeParse({ ...base, yearsExperience: 3, certificateCount: 51 }).success).toBe(false);
+    expect(candidateProfileInputSchema.safeParse({ ...base, yearsExperience: 3, highestEducationLevel: 'mba' }).success).toBe(false);
   });
 });
 
