@@ -153,7 +153,16 @@ export function createApp(options: AppOptions = {}) {
       return;
     }
 
-    console.error(JSON.stringify({ level: 'error', service: 'cvideo-api', message: 'unhandled_error' }));
+    const errorDetails = typeof error === 'object' && error !== null ? error as Record<string, unknown> : {};
+    console.error(JSON.stringify({
+      level: 'error',
+      service: 'cvideo-api',
+      message: 'unhandled_error',
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorCode: typeof errorDetails.code === 'string' ? errorDetails.code : undefined,
+      constraint: typeof errorDetails.constraint === 'string' ? errorDetails.constraint : undefined,
+    }));
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: {} } });
   };
 
