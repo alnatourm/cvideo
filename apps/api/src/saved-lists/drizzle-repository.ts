@@ -46,8 +46,15 @@ export class DrizzleSavedListsRepository implements SavedListsRepository {
     if (!row) return null;
 
     const candidates = await this.db
-      .select({ candidateId: savedCandidates.candidateId })
+      .select({
+        candidateId: savedCandidates.candidateId,
+        displayName: candidateProfiles.displayName,
+        headline: candidateProfiles.headline,
+        city: candidateProfiles.city,
+        countryCode: candidateProfiles.countryCode,
+      })
       .from(savedCandidates)
+      .innerJoin(candidateProfiles, eq(candidateProfiles.id, savedCandidates.candidateId))
       .where(eq(savedCandidates.listId, listId))
       .orderBy(desc(savedCandidates.createdAt));
 
@@ -55,6 +62,13 @@ export class DrizzleSavedListsRepository implements SavedListsRepository {
       ...row,
       candidateCount: candidates.length,
       candidateIds: candidates.map((candidate) => candidate.candidateId),
+      candidates: candidates.map((candidate) => ({
+        id: candidate.candidateId,
+        displayName: candidate.displayName,
+        headline: candidate.headline,
+        city: candidate.city,
+        countryCode: candidate.countryCode,
+      })),
     };
   }
 

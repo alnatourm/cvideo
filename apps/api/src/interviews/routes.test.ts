@@ -172,4 +172,19 @@ describe('Interviews API', () => {
     expect(foreignRead.status).toBe(404);
     expect(foreignRead.body.error.code).toBe('INTERVIEW_NOT_FOUND');
   });
+
+  it('accepts a legacy Google Meet request when the provider is not configured', async () => {
+    const auth = new AuthService(new MemoryAuthRepository());
+    const repository = new MemoryInterviewsRepository();
+    const app = createApp({ authService: auth, interviewsService: new InterviewsService(repository), secureCookies: false });
+    const candidate = await registerCandidate(app); repository.bindCandidateUser(candidate.userId);
+    const company = await registerCompany(app, 'interview-legacy@example.com', 'CR-LEGACY');
+    const created = await request(app).post('/api/v1/interviews').set('authorization', `Bearer ${company.token}`).send(requestPayload(repository.candidateId));
+
+    const accepted = await request(app).post(`/api/v1/interviews/${created.body.data.id}/accept`).set('authorization', `Bearer ${candidate.token}`);
+
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.data.status).toBe('accepted');
+    expect(accepted.body.data.meetingJoinUrl).toBeNull();
+  });
 });

@@ -34,6 +34,7 @@ import {
   type TaxonomyItem,
 } from './api';
 import { inspectVideo, normalizeVideoMimeType } from './video-metadata';
+import { buildRecruiterSearchParams } from './recruiter-search';
 import { useAuth } from './auth';
 import { direction, landingFlowSteps, type Locale, t } from './i18n';
 
@@ -435,6 +436,9 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [experienceDraft, setExperienceDraft] = useState({ companyName: '', jobTitle: '', location: '', startDate: '', endDate: '', isCurrent: false, description: '' });
+  const [educationDraft, setEducationDraft] = useState({ institution: '', qualification: '', fieldOfStudy: '', startDate: '', endDate: '', description: '' });
+  const [certificateDraft, setCertificateDraft] = useState({ name: '', issuingOrganization: '', issueDate: '', expiryDate: '', credentialUrl: '' });
 
   async function load() {
     try {
@@ -504,6 +508,81 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
 
   function multiValues(event: React.ChangeEvent<HTMLSelectElement>) {
     return Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
+  }
+
+  async function addExperience() {
+    if (!profile) return;
+    if (!experienceDraft.companyName.trim() || !experienceDraft.jobTitle.trim() || !experienceDraft.startDate) {
+      setError(text(locale, 'Company, job title, and start date are required.', 'الشركة والمسمى الوظيفي وتاريخ البدء مطلوبة.'));
+      return;
+    }
+    setBusy('experience'); setError(''); setNotice('');
+    try {
+      const created = await api.createCandidateExperience({
+        companyName: experienceDraft.companyName.trim(), jobTitle: experienceDraft.jobTitle.trim(),
+        location: experienceDraft.location.trim() || null, startDate: experienceDraft.startDate,
+        endDate: experienceDraft.isCurrent ? null : experienceDraft.endDate || null,
+        isCurrent: experienceDraft.isCurrent, description: experienceDraft.description.trim() || null,
+      });
+      setProfile({ ...profile, experience: [created, ...profile.experience] });
+      setExperienceDraft({ companyName: '', jobTitle: '', location: '', startDate: '', endDate: '', isCurrent: false, description: '' });
+      setNotice(text(locale, 'Experience added.', 'تمت إضافة الخبرة.'));
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  async function addEducation() {
+    if (!profile) return;
+    if (!educationDraft.institution.trim() || !educationDraft.qualification.trim()) {
+      setError(text(locale, 'Institution and qualification are required.', 'المؤسسة والمؤهل مطلوبان.'));
+      return;
+    }
+    setBusy('education'); setError(''); setNotice('');
+    try {
+      const created = await api.createCandidateEducation({
+        institution: educationDraft.institution.trim(), qualification: educationDraft.qualification.trim(),
+        fieldOfStudy: educationDraft.fieldOfStudy.trim() || null, startDate: educationDraft.startDate || null,
+        endDate: educationDraft.endDate || null, description: educationDraft.description.trim() || null,
+      });
+      setProfile({ ...profile, education: [created, ...profile.education] });
+      setEducationDraft({ institution: '', qualification: '', fieldOfStudy: '', startDate: '', endDate: '', description: '' });
+      setNotice(text(locale, 'Education added.', 'تمت إضافة التعليم.'));
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  async function addCertificate() {
+    if (!profile) return;
+    if (!certificateDraft.name.trim() || !certificateDraft.issuingOrganization.trim()) {
+      setError(text(locale, 'Certificate name and issuing organization are required.', 'اسم الشهادة والجهة المانحة مطلوبان.'));
+      return;
+    }
+    setBusy('certificate'); setError(''); setNotice('');
+    try {
+      const created = await api.createCandidateCertificate({
+        name: certificateDraft.name.trim(), issuingOrganization: certificateDraft.issuingOrganization.trim(),
+        issueDate: certificateDraft.issueDate || null, expiryDate: certificateDraft.expiryDate || null,
+        credentialId: null, credentialUrl: certificateDraft.credentialUrl.trim() || null,
+      });
+      setProfile({ ...profile, certificates: [created, ...profile.certificates] });
+      setCertificateDraft({ name: '', issuingOrganization: '', issueDate: '', expiryDate: '', credentialUrl: '' });
+      setNotice(text(locale, 'Certificate added.', 'تمت إضافة الشهادة.'));
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  async function removeEvidence(kind: 'experience' | 'education' | 'certificate', id: string) {
+    if (!profile || !window.confirm(text(locale, 'Remove this record?', 'حذف هذا السجل؟'))) return;
+    setBusy(`${kind}-${id}`); setError(''); setNotice('');
+    try {
+      if (kind === 'experience') await api.deleteCandidateExperience(id);
+      if (kind === 'education') await api.deleteCandidateEducation(id);
+      if (kind === 'certificate') await api.deleteCandidateCertificate(id);
+      setProfile({
+        ...profile,
+        experience: kind === 'experience' ? profile.experience.filter((item) => item.id !== id) : profile.experience,
+        education: kind === 'education' ? profile.education.filter((item) => item.id !== id) : profile.education,
+        certificates: kind === 'certificate' ? profile.certificates.filter((item) => item.id !== id) : profile.certificates,
+      });
+      setNotice(text(locale, 'Record removed.', 'تم حذف السجل.'));
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
   }
 
   async function uploadVideo(file: File) {
@@ -585,6 +664,52 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
           <label>{text(locale, 'Skills', 'المهارات')}<select multiple value={profile.skillIds} onChange={(e) => setProfile({ ...profile, skillIds: multiValues(e).slice(0, 50) })}>{skills.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Languages', 'اللغات')}<select multiple value={profile.languageIds} onChange={(e) => setProfile({ ...profile, languageIds: multiValues(e).slice(0, 20) })}>{languages.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label className="span-two">{text(locale, 'Professional summary', 'الملخص المهني')}<textarea rows={5} value={profile.professionalSummary ?? ''} onChange={(e) => setProfile({ ...profile, professionalSummary: e.target.value || null })} /></label>
+
+          <section className="span-two evidence-editor">
+            <div><span className="eyebrow">{text(locale, 'Professional evidence', 'التفاصيل المهنية')}</span><h2>{text(locale, 'Experience, education and certificates', 'الخبرة والتعليم والشهادات')}</h2><p className="muted">{text(locale, 'Add the records companies should see when they open your full profile.', 'أضف السجلات التي يجب أن تراها الشركات عند فتح ملفك الكامل.')}</p></div>
+
+            <details open>
+              <summary>{text(locale, `Experience (${profile.experience.length})`, `الخبرة (${profile.experience.length})`)}</summary>
+              <div className="evidence-records">{profile.experience.map((item) => <article key={item.id}><div><strong>{item.jobTitle}</strong><span>{item.companyName}{item.location ? ` · ${item.location}` : ''}</span><small>{item.startDate} — {item.isCurrent ? text(locale, 'Present', 'حتى الآن') : item.endDate ?? text(locale, 'Not specified', 'غير محدد')}</small></div><button type="button" className="ghost small" disabled={busy === `experience-${item.id}`} onClick={() => void removeEvidence('experience', item.id)}>{text(locale, 'Remove', 'حذف')}</button></article>)}</div>
+              <div className="form-grid two evidence-form">
+                <label>{text(locale, 'Job title', 'المسمى الوظيفي')}<input value={experienceDraft.jobTitle} onChange={(e) => setExperienceDraft({ ...experienceDraft, jobTitle: e.target.value })} /></label>
+                <label>{text(locale, 'Company', 'الشركة')}<input value={experienceDraft.companyName} onChange={(e) => setExperienceDraft({ ...experienceDraft, companyName: e.target.value })} /></label>
+                <label>{text(locale, 'Location', 'الموقع')}<input value={experienceDraft.location} onChange={(e) => setExperienceDraft({ ...experienceDraft, location: e.target.value })} /></label>
+                <label>{text(locale, 'Start date', 'تاريخ البدء')}<input type="date" value={experienceDraft.startDate} onChange={(e) => setExperienceDraft({ ...experienceDraft, startDate: e.target.value })} /></label>
+                <label>{text(locale, 'End date', 'تاريخ الانتهاء')}<input type="date" disabled={experienceDraft.isCurrent} value={experienceDraft.endDate} onChange={(e) => setExperienceDraft({ ...experienceDraft, endDate: e.target.value })} /></label>
+                <label className="check-field"><input type="checkbox" checked={experienceDraft.isCurrent} onChange={(e) => setExperienceDraft({ ...experienceDraft, isCurrent: e.target.checked, endDate: e.target.checked ? '' : experienceDraft.endDate })} />{text(locale, 'Current role', 'العمل الحالي')}</label>
+                <label className="span-two">{text(locale, 'Description', 'الوصف')}<textarea rows={3} value={experienceDraft.description} onChange={(e) => setExperienceDraft({ ...experienceDraft, description: e.target.value })} /></label>
+                <button type="button" className="button secondary span-two" disabled={busy === 'experience'} onClick={() => void addExperience()}>{text(locale, 'Add experience', 'إضافة خبرة')}</button>
+              </div>
+            </details>
+
+            <details>
+              <summary>{text(locale, `Education (${profile.education.length})`, `التعليم (${profile.education.length})`)}</summary>
+              <div className="evidence-records">{profile.education.map((item) => <article key={item.id}><div><strong>{item.qualification}</strong><span>{item.institution}{item.fieldOfStudy ? ` · ${item.fieldOfStudy}` : ''}</span></div><button type="button" className="ghost small" disabled={busy === `education-${item.id}`} onClick={() => void removeEvidence('education', item.id)}>{text(locale, 'Remove', 'حذف')}</button></article>)}</div>
+              <div className="form-grid two evidence-form">
+                <label>{text(locale, 'Institution', 'المؤسسة التعليمية')}<input value={educationDraft.institution} onChange={(e) => setEducationDraft({ ...educationDraft, institution: e.target.value })} /></label>
+                <label>{text(locale, 'Qualification', 'المؤهل')}<input value={educationDraft.qualification} onChange={(e) => setEducationDraft({ ...educationDraft, qualification: e.target.value })} /></label>
+                <label>{text(locale, 'Field of study', 'مجال الدراسة')}<input value={educationDraft.fieldOfStudy} onChange={(e) => setEducationDraft({ ...educationDraft, fieldOfStudy: e.target.value })} /></label>
+                <label>{text(locale, 'Start date', 'تاريخ البدء')}<input type="date" value={educationDraft.startDate} onChange={(e) => setEducationDraft({ ...educationDraft, startDate: e.target.value })} /></label>
+                <label>{text(locale, 'End date', 'تاريخ الانتهاء')}<input type="date" value={educationDraft.endDate} onChange={(e) => setEducationDraft({ ...educationDraft, endDate: e.target.value })} /></label>
+                <label className="span-two">{text(locale, 'Description', 'الوصف')}<textarea rows={3} value={educationDraft.description} onChange={(e) => setEducationDraft({ ...educationDraft, description: e.target.value })} /></label>
+                <button type="button" className="button secondary span-two" disabled={busy === 'education'} onClick={() => void addEducation()}>{text(locale, 'Add education', 'إضافة تعليم')}</button>
+              </div>
+            </details>
+
+            <details>
+              <summary>{text(locale, `Certificates (${profile.certificates.length})`, `الشهادات (${profile.certificates.length})`)}</summary>
+              <div className="evidence-records">{profile.certificates.map((item) => <article key={item.id}><div><strong>{item.name}</strong><span>{item.issuingOrganization}</span></div><button type="button" className="ghost small" disabled={busy === `certificate-${item.id}`} onClick={() => void removeEvidence('certificate', item.id)}>{text(locale, 'Remove', 'حذف')}</button></article>)}</div>
+              <div className="form-grid two evidence-form">
+                <label>{text(locale, 'Certificate name', 'اسم الشهادة')}<input value={certificateDraft.name} onChange={(e) => setCertificateDraft({ ...certificateDraft, name: e.target.value })} /></label>
+                <label>{text(locale, 'Issuing organization', 'الجهة المانحة')}<input value={certificateDraft.issuingOrganization} onChange={(e) => setCertificateDraft({ ...certificateDraft, issuingOrganization: e.target.value })} /></label>
+                <label>{text(locale, 'Issue date', 'تاريخ الإصدار')}<input type="date" value={certificateDraft.issueDate} onChange={(e) => setCertificateDraft({ ...certificateDraft, issueDate: e.target.value })} /></label>
+                <label>{text(locale, 'Expiry date', 'تاريخ الانتهاء')}<input type="date" value={certificateDraft.expiryDate} onChange={(e) => setCertificateDraft({ ...certificateDraft, expiryDate: e.target.value })} /></label>
+                <label className="span-two">{text(locale, 'Credential URL (optional)', 'رابط الشهادة (اختياري)')}<input type="url" value={certificateDraft.credentialUrl} onChange={(e) => setCertificateDraft({ ...certificateDraft, credentialUrl: e.target.value })} /></label>
+                <button type="button" className="button secondary span-two" disabled={busy === 'certificate'} onClick={() => void addCertificate()}>{text(locale, 'Add certificate', 'إضافة شهادة')}</button>
+              </div>
+            </details>
+          </section>
         </form>
 
         <aside className="panel video-manager">
@@ -615,19 +740,17 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
   const [minExperience, setMinExperience] = useState('');
   const [lists, setLists] = useState<SavedList[]>([]);
   const [listId, setListId] = useState('');
+  const [newListName, setNewListName] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState('');
   const [showInterview, setShowInterview] = useState(false);
-  const [interviewForm, setInterviewForm] = useState({ opportunityTitle: '', startsAt: '', durationMinutes: 30, meetingType: 'google_meet' as Interview['meetingType'], message: '', location: '' });
+  const [interviewForm, setInterviewForm] = useState({ opportunityTitle: '', startsAt: '', durationMinutes: 30, meetingType: 'video_call' as Interview['meetingType'], message: '', location: '' });
 
   async function search(event?: FormEvent) {
     event?.preventDefault(); setBusy('search'); setError('');
     try {
-      const params = new URLSearchParams({ pageSize: '20' });
-      if (countryCode.trim()) params.set('countryCode', countryCode.trim().toUpperCase());
-      if (city.trim()) params.set('city', city.trim());
-      if (minExperience) params.set('minExperienceYears', minExperience);
+      const params = buildRecruiterSearchParams({ countryCode, city, minExperience });
       const result = await api.searchCandidates(params);
       setCandidates(result.items);
       if (result.items[0]) setSelected(await api.getCandidateDetail(result.items[0].id)); else setSelected(null);
@@ -667,8 +790,11 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
     try {
       let target = listId;
       if (!target) {
-        const created = await api.createSavedList(text(locale, 'My Candidates', 'مرشحوني'));
-        setLists((current) => [created, ...current]); target = created.id; setListId(created.id);
+        const requestedName = newListName.trim();
+        if (!requestedName) throw new Error(text(locale, 'Choose a list or enter a new list name.', 'اختر قائمة أو اكتب اسم قائمة جديدة.'));
+        const created = await api.createSavedList(requestedName);
+        setLists((current) => current.some((list) => list.id === created.id) ? current : [created, ...current]);
+        target = created.id; setListId(created.id); setNewListName('');
       }
       await api.addCandidateToList(target, selected.id);
       setNotice(text(locale, 'Candidate saved.', 'تم حفظ المرشح.'));
@@ -703,7 +829,7 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
             <div><span className="eyebrow">{text(locale, 'Filters', 'الفلاتر')}</span><h2>{text(locale, 'Find talent', 'ابحث عن المواهب')}</h2></div>
             <label>{text(locale, 'Country code', 'رمز الدولة')}<input placeholder="JO" maxLength={2} value={countryCode} onChange={(e) => setCountryCode(e.target.value)} /></label>
             <label>{text(locale, 'City', 'المدينة')}<input placeholder={text(locale, 'Amman', 'عمّان')} value={city} onChange={(e) => setCity(e.target.value)} /></label>
-            <label>{text(locale, 'Minimum experience', 'الحد الأدنى للخبرة')}<input type="number" min={0} max={80} placeholder="0" value={minExperience} onChange={(e) => setMinExperience(e.target.value)} /></label>
+            <label>{text(locale, 'Minimum years of experience', 'الحد الأدنى لسنوات الخبرة')}<input type="number" min={0} max={80} step={1} placeholder="0" value={minExperience} onChange={(e) => setMinExperience(e.target.value)} /></label>
             <button className="button primary full" disabled={busy === 'search'}>{text(locale, 'Search', 'بحث')}</button>
           </form>
           <div className="result-list"><small>{candidates.length} {text(locale, 'results', 'نتيجة')}</small>{candidates.map((candidate) => <button key={candidate.id} type="button" className={`result-card ${selected?.id === candidate.id ? 'active' : ''}`} onClick={() => void chooseCandidate(candidate.id)}><span className="mini-avatar">{candidate.displayName.slice(0, 1)}</span><span><strong>{candidate.displayName}</strong><small>{candidate.headline || text(locale, 'Professional', 'مهني')} · {candidate.city}</small></span></button>)}</div>
@@ -720,17 +846,21 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
             {selected.professionalSummary && <p className="candidate-summary">{selected.professionalSummary}</p>}
             <div className="evidence-row"><span>{selected.skillIds.length} {text(locale, 'skills', 'مهارات')}</span><span>{selected.certificates.length} {text(locale, 'certificates', 'شهادات')}</span><span>{selected.experience.length} {text(locale, 'roles', 'خبرات')}</span></div>
             <div className="action-stack">
-              <div className="inline-save"><select value={listId} onChange={(e) => setListId(e.target.value)}><option value="">{text(locale, 'Auto-create list', 'إنشاء قائمة تلقائياً')}</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><button className="button secondary" disabled={busy === 'save'} onClick={() => void saveCandidate()}>{text(locale, 'Save', 'حفظ')}</button></div>
+              <div className="save-list-controls"><select value={listId} onChange={(e) => { setListId(e.target.value); if (e.target.value) setNewListName(''); }}><option value="">{text(locale, 'Choose an existing list', 'اختر قائمة موجودة')}</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><span>{text(locale, 'or', 'أو')}</span><input value={newListName} disabled={Boolean(listId)} placeholder={text(locale, 'Enter a new list name', 'اكتب اسم قائمة جديدة')} onChange={(e) => setNewListName(e.target.value)} /><button className="button secondary" disabled={busy === 'save' || (!listId && !newListName.trim())} onClick={() => void saveCandidate()}>{text(locale, 'Save candidate', 'حفظ المرشح')}</button></div>
               <button className="button secondary full" disabled={busy === 'chat'} onClick={() => void startChat()}>{text(locale, 'Start Chat', 'بدء محادثة')}</button>
               {selected.cvOriginalFilename && <button className="button secondary full" disabled={busy === 'cv'} onClick={() => void downloadCandidateCv()}>{text(locale, 'Download CV', 'تنزيل السيرة الذاتية')}</button>}
               <button className="button primary full" onClick={() => { setInterviewForm((current) => ({ ...current, opportunityTitle: selected.headline || '' })); setShowInterview(true); }}>{t(locale, 'requestInterview')}</button>
             </div>
-            <details className="evidence-details"><summary>{text(locale, 'Open full professional evidence', 'عرض التفاصيل المهنية الكاملة')}</summary><div><h4>{text(locale, 'Experience', 'الخبرة')}</h4>{selected.experience.map((item, index) => <p key={index}>{String(item.jobTitle ?? '')} · {String(item.companyName ?? '')}</p>)}<h4>{text(locale, 'Education', 'التعليم')}</h4>{selected.education.map((item, index) => <p key={index}>{String(item.qualification ?? '')} · {String(item.institution ?? '')}</p>)}<h4>{text(locale, 'Certificates', 'الشهادات')}</h4>{selected.certificates.map((item, index) => <p key={index}>{String(item.name ?? '')}</p>)}</div></details>
+            <details className="evidence-details"><summary>{text(locale, 'Open full professional evidence', 'عرض التفاصيل المهنية الكاملة')}</summary><div>
+              <section><h4>{text(locale, 'Experience', 'الخبرة')}</h4>{selected.experience.length ? selected.experience.map((item) => <article className="candidate-evidence-item" key={item.id}><strong>{item.jobTitle}</strong><span>{item.companyName}{item.location ? ` · ${item.location}` : ''}</span><small>{item.startDate} — {item.isCurrent ? text(locale, 'Present', 'حتى الآن') : item.endDate ?? text(locale, 'Not specified', 'غير محدد')}</small>{item.description && <p>{item.description}</p>}</article>) : <p className="muted">{text(locale, 'The candidate has not added experience yet.', 'لم يضف المرشح خبرات بعد.')}</p>}</section>
+              <section><h4>{text(locale, 'Education', 'التعليم')}</h4>{selected.education.length ? selected.education.map((item) => <article className="candidate-evidence-item" key={item.id}><strong>{item.qualification}</strong><span>{item.institution}{item.fieldOfStudy ? ` · ${item.fieldOfStudy}` : ''}</span>{(item.startDate || item.endDate) && <small>{item.startDate ?? ''} — {item.endDate ?? text(locale, 'Present', 'حتى الآن')}</small>}{item.description && <p>{item.description}</p>}</article>) : <p className="muted">{text(locale, 'The candidate has not added education yet.', 'لم يضف المرشح بيانات التعليم بعد.')}</p>}</section>
+              <section><h4>{text(locale, 'Certificates', 'الشهادات')}</h4>{selected.certificates.length ? selected.certificates.map((item) => <article className="candidate-evidence-item" key={item.id}><strong>{item.name}</strong><span>{item.issuingOrganization}</span>{item.issueDate && <small>{item.issueDate}</small>}{item.credentialUrl && <a href={item.credentialUrl} target="_blank" rel="noreferrer">{text(locale, 'View credential', 'عرض الشهادة')}</a>}</article>) : <p className="muted">{text(locale, 'The candidate has not added certificates yet.', 'لم يضف المرشح شهادات بعد.')}</p>}</section>
+            </div></details>
           </>}
         </aside>
       </div>
 
-      {showInterview && selected && <div className="modal-backdrop" onMouseDown={() => setShowInterview(false)}><form className="modal-card" onSubmit={requestInterview} onMouseDown={(e) => e.stopPropagation()}><div className="panel-head"><div><span className="eyebrow">{text(locale, 'Interview request', 'طلب مقابلة')}</span><h2>{selected.displayName}</h2></div><button className="ghost" type="button" onClick={() => setShowInterview(false)}>✕</button></div><label>{text(locale, 'Role / opportunity title', 'المسمى / الفرصة')}<input required value={interviewForm.opportunityTitle} onChange={(e) => setInterviewForm({ ...interviewForm, opportunityTitle: e.target.value })} /></label><label>{text(locale, 'Date & time', 'التاريخ والوقت')}<input type="datetime-local" required value={interviewForm.startsAt} onChange={(e) => setInterviewForm({ ...interviewForm, startsAt: e.target.value })} /></label><div className="form-grid two"><label>{text(locale, 'Duration', 'المدة')}<select value={interviewForm.durationMinutes} onChange={(e) => setInterviewForm({ ...interviewForm, durationMinutes: Number(e.target.value) })}><option value={20}>20 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option></select></label><label>{text(locale, 'Type', 'النوع')}<select value={interviewForm.meetingType} onChange={(e) => setInterviewForm({ ...interviewForm, meetingType: e.target.value as Interview['meetingType'] })}><option value="google_meet">Google Meet</option><option value="video_call">{text(locale, 'Video call', 'مكالمة فيديو')}</option><option value="in_person">{text(locale, 'In person', 'حضوري')}</option></select></label></div>{interviewForm.meetingType === 'in_person' && <label>{text(locale, 'Location', 'الموقع')}<input required value={interviewForm.location} onChange={(e) => setInterviewForm({ ...interviewForm, location: e.target.value })} /></label>}<label>{text(locale, 'Message', 'رسالة')}<textarea rows={3} value={interviewForm.message} onChange={(e) => setInterviewForm({ ...interviewForm, message: e.target.value })} /></label><button className="button primary full" disabled={busy === 'interview'}>{text(locale, 'Send interview request', 'إرسال طلب المقابلة')}</button></form></div>}
+      {showInterview && selected && <div className="modal-backdrop" onMouseDown={() => setShowInterview(false)}><form className="modal-card" onSubmit={requestInterview} onMouseDown={(e) => e.stopPropagation()}><div className="panel-head"><div><span className="eyebrow">{text(locale, 'Interview request', 'طلب مقابلة')}</span><h2>{selected.displayName}</h2></div><button className="ghost" type="button" onClick={() => setShowInterview(false)}>✕</button></div><label>{text(locale, 'Role / opportunity title', 'المسمى / الفرصة')}<input required value={interviewForm.opportunityTitle} onChange={(e) => setInterviewForm({ ...interviewForm, opportunityTitle: e.target.value })} /></label><label>{text(locale, 'Date & time', 'التاريخ والوقت')}<input type="datetime-local" required value={interviewForm.startsAt} onChange={(e) => setInterviewForm({ ...interviewForm, startsAt: e.target.value })} /></label><div className="form-grid two"><label>{text(locale, 'Duration', 'المدة')}<select value={interviewForm.durationMinutes} onChange={(e) => setInterviewForm({ ...interviewForm, durationMinutes: Number(e.target.value) })}><option value={20}>20 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option></select></label><label>{text(locale, 'Type', 'النوع')}<select value={interviewForm.meetingType} onChange={(e) => setInterviewForm({ ...interviewForm, meetingType: e.target.value as Interview['meetingType'] })}><option value="video_call">{text(locale, 'Video call — arrange link in chat', 'مكالمة فيديو — يتم ترتيب الرابط في المحادثة')}</option><option value="in_person">{text(locale, 'In person', 'حضوري')}</option></select></label></div>{interviewForm.meetingType === 'video_call' && <p className="tiny muted">{text(locale, 'Google Meet is temporarily unavailable. Send the meeting link to the candidate in CVIDEO chat.', 'Google Meet غير متاح مؤقتاً. أرسل رابط الاجتماع إلى المرشح عبر محادثة CVIDEO.')}</p>}{interviewForm.meetingType === 'in_person' && <label>{text(locale, 'Location', 'الموقع')}<input required value={interviewForm.location} onChange={(e) => setInterviewForm({ ...interviewForm, location: e.target.value })} /></label>}<label>{text(locale, 'Message', 'رسالة')}<textarea rows={3} value={interviewForm.message} onChange={(e) => setInterviewForm({ ...interviewForm, message: e.target.value })} /></label><button className="button primary full" disabled={busy === 'interview'}>{text(locale, 'Send interview request', 'إرسال طلب المقابلة')}</button></form></div>}
     </AppShell>
   );
 }
@@ -757,7 +887,17 @@ function SavedListsPage({ locale, setLocale }: { locale: Locale; setLocale: (loc
     try { setSelected(await api.getSavedList(id)); } catch (err) { setError(errorMessage(err)); }
   }
 
-  return <AppShell locale={locale} setLocale={setLocale}><PageHead eyebrow={text(locale, 'Saved Lists', 'القوائم المحفوظة')} title={text(locale, 'Organize people, not applications', 'نظّم الأشخاص، لا طلبات التوظيف')} description={text(locale, 'Saved Lists are private company collections, never ATS stages.', 'القوائم المحفوظة مجموعات خاصة بالشركة وليست مراحل توظيف.')}/>{error && <div className="notice error">{error}</div>}<div className="saved-layout"><section className="panel"><form className="inline-form" onSubmit={create}><input placeholder={text(locale, 'New list name', 'اسم قائمة جديدة')} value={newName} onChange={(e) => setNewName(e.target.value)} /><button className="button primary">＋</button></form><div className="list-stack">{lists.map((list) => <button className={`saved-list-card ${selected?.id === list.id ? 'active' : ''}`} key={list.id} onClick={() => void openList(list.id)}><div><strong>{list.name}</strong><small>{list.description || text(locale, 'Candidate collection', 'مجموعة مرشحين')}</small></div><b>{list.candidateCount}</b></button>)}</div></section><section className="panel"><span className="eyebrow">{text(locale, 'Selected list', 'القائمة المختارة')}</span><h2>{selected?.name || text(locale, 'Choose a list', 'اختر قائمة')}</h2>{selected?.candidateIds?.length ? <div className="candidate-id-list">{selected.candidateIds.map((id) => <div key={id}><span className="mini-avatar">C</span><code>{id}</code></div>)}</div> : <div className="empty-state">{text(locale, 'Save candidates from Search and they will appear here.', 'احفظ المرشحين من البحث وسيظهرون هنا.')}</div>}</section></div></AppShell>;
+  async function removeCandidate(candidateId: string) {
+    if (!selected) return;
+    try {
+      await api.removeCandidateFromList(selected.id, candidateId);
+      const refreshed = await api.getSavedList(selected.id);
+      setSelected(refreshed);
+      setLists((current) => current.map((list) => list.id === refreshed.id ? { ...list, candidateCount: refreshed.candidateCount } : list));
+    } catch (err) { setError(errorMessage(err)); }
+  }
+
+  return <AppShell locale={locale} setLocale={setLocale}><PageHead eyebrow={text(locale, 'Saved Lists', 'القوائم المحفوظة')} title={text(locale, 'Organize people, not applications', 'نظّم الأشخاص، لا طلبات التوظيف')} description={text(locale, 'Saved Lists are private company collections, never ATS stages.', 'القوائم المحفوظة مجموعات خاصة بالشركة وليست مراحل توظيف.')}/>{error && <div className="notice error">{error}</div>}<div className="saved-layout"><section className="panel"><form className="inline-form" onSubmit={create}><input placeholder={text(locale, 'New list name', 'اسم قائمة جديدة')} value={newName} onChange={(e) => setNewName(e.target.value)} /><button className="button primary">＋</button></form><div className="list-stack">{lists.map((list) => <button className={`saved-list-card ${selected?.id === list.id ? 'active' : ''}`} key={list.id} onClick={() => void openList(list.id)}><div><strong>{list.name}</strong><small>{list.description || text(locale, 'Candidate collection', 'مجموعة مرشحين')}</small></div><b>{list.candidateCount}</b></button>)}</div></section><section className="panel"><span className="eyebrow">{text(locale, 'Selected list', 'القائمة المختارة')}</span><h2>{selected?.name || text(locale, 'Choose a list', 'اختر قائمة')}</h2>{selected?.candidates?.length ? <div className="saved-candidate-list">{selected.candidates.map((candidate) => <article key={candidate.id}><span className="mini-avatar">{candidate.displayName.slice(0, 1)}</span><div><strong>{candidate.displayName}</strong><small>{candidate.headline || text(locale, 'Professional candidate', 'مرشح مهني')} · {candidate.city}, {candidate.countryCode}</small></div><button type="button" className="ghost small" onClick={() => void removeCandidate(candidate.id)}>{text(locale, 'Remove', 'إزالة')}</button></article>)}</div> : <div className="empty-state">{text(locale, 'Save candidates from Search and they will appear here.', 'احفظ المرشحين من البحث وسيظهرون هنا.')}</div>}</section></div></AppShell>;
 }
 
 function MessagesPage({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {

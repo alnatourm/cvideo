@@ -23,11 +23,16 @@ export class SavedListsService {
   }
 
   async create(companyId: string, actorUserId: string, input: unknown) {
-    return this.repository.create(
-      uuidSchema.parse(companyId),
-      uuidSchema.parse(actorUserId),
-      savedListInputSchema.parse(input),
+    const parsedCompanyId = uuidSchema.parse(companyId);
+    const value = savedListInputSchema.parse(input);
+    const existing = (await this.repository.list(parsedCompanyId)).find(
+      (list) => list.name.trim().toLocaleLowerCase() === value.name.toLocaleLowerCase(),
     );
+    if (existing) {
+      const detail = await this.repository.get(parsedCompanyId, existing.id);
+      if (detail) return detail;
+    }
+    return this.repository.create(parsedCompanyId, uuidSchema.parse(actorUserId), value);
   }
 
   async update(companyId: string, listId: string, input: unknown) {

@@ -11,6 +11,37 @@ export interface Principal {
   clientType: 'web' | 'mobile';
 }
 
+export interface CandidateExperience {
+  id: string;
+  companyName: string;
+  jobTitle: string;
+  location: string | null;
+  startDate: string;
+  endDate: string | null;
+  isCurrent: boolean;
+  description: string | null;
+}
+
+export interface CandidateEducation {
+  id: string;
+  institution: string;
+  qualification: string;
+  fieldOfStudy: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  description: string | null;
+}
+
+export interface CandidateCertificate {
+  id: string;
+  name: string;
+  issuingOrganization: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  credentialId?: string | null;
+  credentialUrl: string | null;
+}
+
 export interface CandidateProfile {
   id: string;
   displayName: string;
@@ -27,9 +58,9 @@ export interface CandidateProfile {
   preferredRoleIds: string[];
   skillIds: string[];
   languageIds: string[];
-  experience: Array<Record<string, unknown>>;
-  education: Array<Record<string, unknown>>;
-  certificates: Array<Record<string, unknown>>;
+  experience: CandidateExperience[];
+  education: CandidateEducation[];
+  certificates: CandidateCertificate[];
   video: CandidateVideo | null;
 }
 
@@ -72,9 +103,9 @@ export interface CandidateDetail extends CandidateSearchItem {
   preferredRoleIds: string[];
   skillIds: string[];
   languageIds: string[];
-  certificates: Array<Record<string, unknown>>;
-  experience: Array<Record<string, unknown>>;
-  education: Array<Record<string, unknown>>;
+  certificates: CandidateCertificate[];
+  experience: CandidateExperience[];
+  education: CandidateEducation[];
 }
 
 export interface SavedList {
@@ -83,6 +114,7 @@ export interface SavedList {
   description: string | null;
   candidateCount: number;
   candidateIds?: string[];
+  candidates?: Array<Pick<CandidateSearchItem, 'id' | 'displayName' | 'headline' | 'city' | 'countryCode'>>;
   createdAt: string;
   updatedAt: string;
 }
@@ -262,6 +294,12 @@ export const api = {
 
   getCandidateProfile: () => apiRequest<CandidateProfile>('/api/v1/candidate/profile'),
   updateCandidateProfile: (input: unknown) => apiRequest<CandidateProfile>('/api/v1/candidate/profile', { method: 'PUT', body: jsonBody(input) }),
+  createCandidateExperience: (input: Omit<CandidateExperience, 'id'>) => apiRequest<CandidateExperience>('/api/v1/candidate/experience', { method: 'POST', body: jsonBody(input) }),
+  deleteCandidateExperience: (id: string) => apiRequest<void>(`/api/v1/candidate/experience/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createCandidateEducation: (input: Omit<CandidateEducation, 'id'>) => apiRequest<CandidateEducation>('/api/v1/candidate/education', { method: 'POST', body: jsonBody(input) }),
+  deleteCandidateEducation: (id: string) => apiRequest<void>(`/api/v1/candidate/education/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createCandidateCertificate: (input: Omit<CandidateCertificate, 'id'>) => apiRequest<CandidateCertificate>('/api/v1/candidate/certificates', { method: 'POST', body: jsonBody(input) }),
+  deleteCandidateCertificate: (id: string) => apiRequest<void>(`/api/v1/candidate/certificates/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   getProfileCompleteness: () => apiRequest<{ completed: number; total: number; percent: number }>('/api/v1/candidate/profile/completeness'),
   getVisibility: () => apiRequest<{ discoverable: boolean; ready?: boolean; missing?: string[] }>('/api/v1/candidate/visibility'),
   setVisibility: (discoverable: boolean) => apiRequest<{ discoverable: boolean }>('/api/v1/candidate/visibility', { method: 'PUT', body: jsonBody({ discoverable }) }),
