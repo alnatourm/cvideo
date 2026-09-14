@@ -33,10 +33,27 @@ import {
   type SavedList,
   type TaxonomyItem,
 } from './api';
+import { inspectVideo, normalizeVideoMimeType } from './video-metadata';
+import { buildRecruiterSearchParams } from './recruiter-search';
 import { useAuth } from './auth';
 import { direction, landingFlowSteps, type Locale, t } from './i18n';
 
 const companyRoles: EffectiveRole[] = ['company_owner', 'company_admin', 'recruiter'];
+const educationLevels: Array<{ value: CandidateProfile['highestEducationLevel']; en: string; ar: string }> = [
+  { value: 'none', en: 'No formal education', ar: 'بدون مؤهل' },
+  { value: 'high_school', en: 'High school', ar: 'الثانوية العامة' },
+  { value: 'vocational', en: 'Vocational or technical', ar: 'مهني أو تقني' },
+  { value: 'diploma', en: 'Diploma', ar: 'دبلوم' },
+  { value: 'bachelor', en: "Bachelor's", ar: 'بكالوريوس' },
+  { value: 'master', en: "Master's", ar: 'ماجستير' },
+  { value: 'doctorate', en: 'Doctorate (PhD)', ar: 'دكتوراه' },
+  { value: 'professor', en: 'Professor or academic rank', ar: 'أستاذ جامعي' },
+];
+
+function educationLabel(locale: Locale, value: CandidateProfile['highestEducationLevel']) {
+  const item = educationLevels.find((level) => level.value === value) ?? educationLevels[0]!;
+  return locale === 'ar' ? item.ar : item.en;
+}
 
 function text(locale: Locale, en: string, ar: string) {
   return locale === 'ar' ? ar : en;
@@ -80,6 +97,13 @@ function HlsVideo({ src, poster, className = '' }: { src: string; poster?: strin
   }, [src]);
 
   return <video ref={ref} className={className} poster={poster ?? undefined} controls playsInline preload="metadata" />;
+}
+
+function StreamVideo({ embedUrl, playbackUrl, poster, className = '' }: { embedUrl?: string | null; playbackUrl?: string | null; poster?: string | null; className?: string }) {
+  if (embedUrl) {
+    return <iframe className={className} src={embedUrl} title="CVIDEO Introduction Video" loading="lazy" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen />;
+  }
+  return playbackUrl ? <HlsVideo src={playbackUrl} poster={poster} className={className} /> : null;
 }
 
 function PublicHeader({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
@@ -296,6 +320,7 @@ function AppShell({ locale, setLocale, children }: { locale: Locale; setLocale: 
   const companyItems = [
     ['/recruiter/search', text(locale, 'Search', 'البحث'), '⌕'],
     ['/recruiter/saved-lists', text(locale, 'Saved Lists', 'القوائم المحفوظة'), '☆'],
+    ['/recruiter/interviews', text(locale, 'Interviews', 'المقابلات'), '◷'],
     ['/recruiter/messages', text(locale, 'Messages', 'الرسائل'), '✉'],
     ['/recruiter/account', text(locale, 'Company Account', 'حساب الشركة'), '▣'],
   ];
@@ -393,7 +418,7 @@ function CandidateHome({ locale, setLocale }: { locale: Locale; setLocale: (loca
       <div className="dashboard-grid two-wide">
         <section className="panel video-panel">
           <div className="panel-head"><div><span className="eyebrow">30s</span><h2>{t(locale, 'introVideo')}</h2></div><Link to="/candidate/profile" className="text-link">{text(locale, 'Manage video', 'إدارة الفيديو')}</Link></div>
-          {video?.status === 'ready' && video.playbackUrl ? <HlsVideo src={video.playbackUrl} poster={video.thumbnailUrl} className="candidate-home-video" /> : <div className="video-empty"><strong>{text(locale, 'Your video is not ready yet', 'الفيديو غير جاهز بعد')}</strong><span>{text(locale, 'Upload or finish processing from your Profile.', 'ارفع الفيديو أو أكمل معالجته من ملفك الشخصي.')}</span></div>}
+          {video?.status === 'ready' && (video.embedUrl || video.playbackUrl) ? <StreamVideo embedUrl={video.embedUrl} playbackUrl={video.playbackUrl} poster={video.thumbnailUrl} className="candidate-home-video" /> : <div className="video-empty"><strong>{text(locale, 'Your video is not ready yet', 'الفيديو غير جاهز بعد')}</strong><span>{text(locale, 'Upload or finish processing from your Profile.', 'ارفع الفيديو أو أكمل معالجته من ملفك الشخصي.')}</span></div>}
         </section>
         <section className="panel discovery-panel">
           <span className="eyebrow">{text(locale, 'Visibility', 'الظهور')}</span><h2>{text(locale, 'Let verified company users discover your profile', 'اسمح لمستخدمي الشركات باكتشاف ملفك')}</h2>
@@ -416,23 +441,6 @@ function CandidateHome({ locale, setLocale }: { locale: Locale; setLocale: (loca
   );
 }
 
-async function inspectVideo(file: File): Promise<{ durationSeconds: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.onloadedmetadata = () => {
-      const durationSeconds = Math.ceil(video.duration);
-      const height = video.videoHeight;
-      URL.revokeObjectURL(url);
-      if (!Number.isFinite(durationSeconds) || !height) reject(new Error('Could not read video metadata'));
-      else resolve({ durationSeconds, height });
-    };
-    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read video file')); };
-    video.src = url;
-  });
-}
-
 function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [video, setVideo] = useState<CandidateVideo | null>(null);
@@ -447,19 +455,46 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
 
   async function load() {
     try {
-      const [current, currentVideo, categoryList, roleList, skillList, languageList] = await Promise.all([
-        api.getCandidateProfile(), api.getCandidateVideo(), api.categories(), api.jobTitles(), api.skills(), api.languages(),
+      const [current, currentVideo, categoryList, languageList] = await Promise.all([
+        api.getCandidateProfile(), api.getCandidateVideo(), api.categories(), api.languages(),
       ]);
-      setProfile(current); setVideo(currentVideo); setCategories(categoryList); setRoles(roleList); setSkills(skillList); setLanguages(languageList);
-      if (current.primaryCategoryId) setSubcategories(await api.subcategories(current.primaryCategoryId));
+      const [subcategoryList, roleList, skillList] = await Promise.all([
+        current.primaryCategoryId ? api.subcategories(current.primaryCategoryId) : Promise.resolve([]),
+        current.primarySubcategoryId ? api.jobTitles('', current.primarySubcategoryId) : Promise.resolve([]),
+        current.preferredRoleIds.length ? api.skills('', current.preferredRoleIds) : Promise.resolve([]),
+      ]);
+      setProfile(current); setVideo(currentVideo); setCategories(categoryList); setLanguages(languageList);
+      setSubcategories(subcategoryList); setRoles(roleList); setSkills(skillList);
     } catch (err) { setError(errorMessage(err)); }
   }
   useEffect(() => { void load(); }, []);
 
   async function changeCategory(categoryId: string) {
     if (!profile) return;
-    setProfile({ ...profile, primaryCategoryId: categoryId || null, primarySubcategoryId: null });
+    setProfile({
+      ...profile,
+      primaryCategoryId: categoryId || null,
+      primarySubcategoryId: null,
+      preferredRoleIds: [],
+      skillIds: [],
+    });
     setSubcategories(categoryId ? await api.subcategories(categoryId) : []);
+    setRoles([]);
+    setSkills([]);
+  }
+
+  async function changeSubcategory(subcategoryId: string) {
+    if (!profile) return;
+    setProfile({ ...profile, primarySubcategoryId: subcategoryId || null, preferredRoleIds: [], skillIds: [] });
+    setRoles(subcategoryId ? await api.jobTitles('', subcategoryId) : []);
+    setSkills([]);
+  }
+
+  async function changeRoles(roleIds: string[]) {
+    if (!profile) return;
+    const preferredRoleIds = roleIds.slice(0, 5);
+    setProfile({ ...profile, preferredRoleIds, skillIds: [] });
+    setSkills(preferredRoleIds.length ? await api.skills('', preferredRoleIds) : []);
   }
 
   async function saveProfile(event: FormEvent) {
@@ -478,6 +513,8 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
         skillIds: profile.skillIds,
         languageIds: profile.languageIds,
         yearsExperience: profile.yearsExperience,
+        certificateCount: profile.certificateCount,
+        highestEducationLevel: profile.highestEducationLevel,
         professionalSummary: profile.professionalSummary,
       });
       setProfile(updated); setNotice(text(locale, 'Profile saved.', 'تم حفظ الملف.'));
@@ -491,14 +528,20 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
   async function uploadVideo(file: File) {
     setBusy('video'); setError(''); setNotice('');
     try {
+      const mimeType = normalizeVideoMimeType(file);
       const metadata = await inspectVideo(file);
       if (metadata.durationSeconds > 30) throw new Error(text(locale, 'Introduction Video must be 30 seconds or less.', 'يجب ألا يتجاوز الفيديو التعريفي 30 ثانية.'));
       if (metadata.height > 720) throw new Error(text(locale, 'Please choose a video recorded/exported at 720p or below.', 'يرجى اختيار فيديو بدقة 720p أو أقل.'));
-      await api.startCandidateVideo({ filename: file.name, mimeType: file.type, sizeBytes: file.size, durationSeconds: metadata.durationSeconds, height: metadata.height });
-      const processing = await api.uploadCandidateVideo(file);
+      await api.startCandidateVideo({ filename: file.name, mimeType, sizeBytes: file.size, durationSeconds: metadata.durationSeconds, height: metadata.height });
+      const processing = await api.uploadCandidateVideo(file, mimeType);
       setVideo(processing);
       setNotice(text(locale, 'Upload complete. Video is processing.', 'اكتمل الرفع. الفيديو قيد المعالجة.'));
-    } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+    } catch (err) {
+      const message = errorMessage(err);
+      setError(message.includes('metadata') || message.includes('format')
+        ? text(locale, 'This video format could not be read. Choose an MP4, MOV, or WebM file up to 30 seconds and 720p.', 'تعذرت قراءة صيغة الفيديو. اختر ملف MP4 أو MOV أو WebM بمدة لا تتجاوز 30 ثانية ودقة 720p.')
+        : message);
+    } finally { setBusy(''); }
   }
 
   async function syncVideo() {
@@ -555,17 +598,20 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
           <label>{text(locale, 'Country code', 'رمز الدولة')}<input value={profile.countryCode} maxLength={2} onChange={(e) => setProfile({ ...profile, countryCode: e.target.value.toUpperCase() })} /></label>
           <label>{text(locale, 'City', 'المدينة')}<input value={profile.city} onChange={(e) => setProfile({ ...profile, city: e.target.value })} /></label>
           <label>{text(locale, 'Main field', 'المجال الرئيسي')}<select value={profile.primaryCategoryId ?? ''} onChange={(e) => void changeCategory(e.target.value)}><option value="">{text(locale, 'Select field', 'اختر المجال')}</option>{categories.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
-          <label>{text(locale, 'Specialization', 'التخصص')}<select value={profile.primarySubcategoryId ?? ''} onChange={(e) => setProfile({ ...profile, primarySubcategoryId: e.target.value || null })}><option value="">{text(locale, 'Select specialization', 'اختر التخصص')}</option>{subcategories.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
-          <label>{text(locale, 'Years of experience', 'سنوات الخبرة')}<input type="number" min={0} max={80} value={profile.yearsExperience} onChange={(e) => setProfile({ ...profile, yearsExperience: Number(e.target.value) })} /></label>
-          <label>{text(locale, 'Preferred roles (up to 5)', 'الأدوار المفضلة (حتى 5)')}<select multiple value={profile.preferredRoleIds} onChange={(e) => setProfile({ ...profile, preferredRoleIds: multiValues(e).slice(0, 5) })}>{roles.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
+          <label>{text(locale, 'Specialization', 'التخصص')}<select value={profile.primarySubcategoryId ?? ''} onChange={(e) => void changeSubcategory(e.target.value)}><option value="">{text(locale, 'Select specialization', 'اختر التخصص')}</option>{subcategories.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
+          <label>{text(locale, 'Years of experience', 'سنوات الخبرة')}<input type="number" min={0} max={50} step={1} value={profile.yearsExperience} onChange={(e) => setProfile({ ...profile, yearsExperience: Number(e.target.value) })} /></label>
+          <label>{text(locale, 'Certificates', 'عدد الشهادات')}<input type="number" min={0} max={50} step={1} value={profile.certificateCount} onChange={(e) => setProfile({ ...profile, certificateCount: Number(e.target.value) })} /></label>
+          <label>{text(locale, 'Highest education', 'أعلى مؤهل تعليمي')}<select value={profile.highestEducationLevel} onChange={(e) => setProfile({ ...profile, highestEducationLevel: e.target.value as CandidateProfile['highestEducationLevel'] })}>{educationLevels.map((item) => <option key={item.value} value={item.value}>{locale === 'ar' ? item.ar : item.en}</option>)}</select></label>
+          <label>{text(locale, 'Preferred roles (up to 5)', 'الأدوار المفضلة (حتى 5)')}<select multiple value={profile.preferredRoleIds} onChange={(e) => void changeRoles(multiValues(e))}>{roles.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Skills', 'المهارات')}<select multiple value={profile.skillIds} onChange={(e) => setProfile({ ...profile, skillIds: multiValues(e).slice(0, 50) })}>{skills.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label>{text(locale, 'Languages', 'اللغات')}<select multiple value={profile.languageIds} onChange={(e) => setProfile({ ...profile, languageIds: multiValues(e).slice(0, 20) })}>{languages.map((item) => <option key={item.id} value={item.id}>{label(item)}</option>)}</select></label>
           <label className="span-two">{text(locale, 'Professional summary', 'الملخص المهني')}<textarea rows={5} value={profile.professionalSummary ?? ''} onChange={(e) => setProfile({ ...profile, professionalSummary: e.target.value || null })} /></label>
+
         </form>
 
         <aside className="panel video-manager">
           <span className="eyebrow">{t(locale, 'introVideo')}</span><h2>{text(locale, 'Your first impression', 'انطباعك الأول')}</h2>
-          {video?.status === 'ready' && video.playbackUrl ? <HlsVideo src={video.playbackUrl} poster={video.thumbnailUrl} className="profile-video" /> : <div className="portrait-upload"><span>30</span><small>{text(locale, 'seconds max', 'ثانية كحد أقصى')}</small></div>}
+          {video?.status === 'ready' && (video.embedUrl || video.playbackUrl) ? <StreamVideo embedUrl={video.embedUrl} playbackUrl={video.playbackUrl} poster={video.thumbnailUrl} className="profile-video" /> : <div className="portrait-upload"><span>30</span><small>{text(locale, 'seconds max', 'ثانية كحد أقصى')}</small></div>}
           <div className="video-state"><span className={`status ${video?.status ?? 'missing'}`}>{video?.status ?? text(locale, 'missing', 'غير موجود')}</span>{video?.failureReason && <small>{video.failureReason}</small>}</div>
           <label className={`button secondary full file-button ${busy === 'video' ? 'disabled' : ''}`}>{text(locale, 'Choose 30s video', 'اختر فيديو 30 ثانية')}<input type="file" accept="video/mp4,video/webm,video/quicktime" disabled={busy === 'video'} onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadVideo(file); }} /></label>
           {video && ['processing', 'uploading'].includes(video.status) && <button className="button primary full" disabled={busy === 'video'} onClick={() => void syncVideo()} type="button">{text(locale, 'Check processing', 'فحص المعالجة')}</button>}
@@ -584,6 +630,7 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
 
 function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [candidates, setCandidates] = useState<CandidateSearchItem[]>([]);
   const [selected, setSelected] = useState<CandidateDetail | null>(null);
   const [countryCode, setCountryCode] = useState('');
@@ -591,19 +638,17 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
   const [minExperience, setMinExperience] = useState('');
   const [lists, setLists] = useState<SavedList[]>([]);
   const [listId, setListId] = useState('');
+  const [newListName, setNewListName] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState('');
   const [showInterview, setShowInterview] = useState(false);
-  const [interviewForm, setInterviewForm] = useState({ opportunityTitle: '', startsAt: '', durationMinutes: 30, meetingType: 'google_meet' as Interview['meetingType'], message: '', location: '' });
+  const [interviewForm, setInterviewForm] = useState({ opportunityTitle: '', startsAt: '', durationMinutes: 30, meetingType: 'video_call' as Interview['meetingType'], message: '', location: '' });
 
   async function search(event?: FormEvent) {
     event?.preventDefault(); setBusy('search'); setError('');
     try {
-      const params = new URLSearchParams({ pageSize: '20' });
-      if (countryCode.trim()) params.set('countryCode', countryCode.trim().toUpperCase());
-      if (city.trim()) params.set('city', city.trim());
-      if (minExperience) params.set('minExperienceYears', minExperience);
+      const params = buildRecruiterSearchParams({ countryCode, city, minExperience });
       const result = await api.searchCandidates(params);
       setCandidates(result.items);
       if (result.items[0]) setSelected(await api.getCandidateDetail(result.items[0].id)); else setSelected(null);
@@ -611,7 +656,14 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
   }
 
   useEffect(() => {
-    void search();
+    const requestedCandidateId = searchParams.get('candidateId');
+    if (requestedCandidateId) {
+      void api.getCandidateDetail(requestedCandidateId)
+        .then((candidate) => { setCandidates([candidate]); setSelected(candidate); })
+        .catch((err) => setError(errorMessage(err)));
+    } else {
+      void search();
+    }
     void api.listSavedLists().then((result) => { setLists(result); setListId(result[0]?.id ?? ''); }).catch(() => undefined);
   }, []);
 
@@ -643,8 +695,11 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
     try {
       let target = listId;
       if (!target) {
-        const created = await api.createSavedList(text(locale, 'My Candidates', 'مرشحوني'));
-        setLists((current) => [created, ...current]); target = created.id; setListId(created.id);
+        const requestedName = newListName.trim();
+        if (!requestedName) throw new Error(text(locale, 'Choose a list or enter a new list name.', 'اختر قائمة أو اكتب اسم قائمة جديدة.'));
+        const created = await api.createSavedList(requestedName);
+        setLists((current) => current.some((list) => list.id === created.id) ? current : [created, ...current]);
+        target = created.id; setListId(created.id); setNewListName('');
       }
       await api.addCandidateToList(target, selected.id);
       setNotice(text(locale, 'Candidate saved.', 'تم حفظ المرشح.'));
@@ -665,7 +720,7 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
         message: interviewForm.message || undefined,
         location: interviewForm.meetingType === 'in_person' ? interviewForm.location : undefined,
       });
-      setShowInterview(false); setNotice(text(locale, 'Interview request sent.', 'تم إرسال طلب المقابلة.'));
+      setShowInterview(false); setNotice(text(locale, 'Interview request sent. Track its status in Interviews.', 'تم إرسال طلب المقابلة. تابع حالته من صفحة المقابلات.'));
     } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
   }
 
@@ -679,14 +734,14 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
             <div><span className="eyebrow">{text(locale, 'Filters', 'الفلاتر')}</span><h2>{text(locale, 'Find talent', 'ابحث عن المواهب')}</h2></div>
             <label>{text(locale, 'Country code', 'رمز الدولة')}<input placeholder="JO" maxLength={2} value={countryCode} onChange={(e) => setCountryCode(e.target.value)} /></label>
             <label>{text(locale, 'City', 'المدينة')}<input placeholder={text(locale, 'Amman', 'عمّان')} value={city} onChange={(e) => setCity(e.target.value)} /></label>
-            <label>{text(locale, 'Minimum experience', 'الحد الأدنى للخبرة')}<input type="number" min={0} max={80} placeholder="0" value={minExperience} onChange={(e) => setMinExperience(e.target.value)} /></label>
+            <label>{text(locale, 'Minimum years of experience', 'الحد الأدنى لسنوات الخبرة')}<input type="number" min={0} max={80} step={1} placeholder="0" value={minExperience} onChange={(e) => setMinExperience(e.target.value)} /></label>
             <button className="button primary full" disabled={busy === 'search'}>{text(locale, 'Search', 'بحث')}</button>
           </form>
           <div className="result-list"><small>{candidates.length} {text(locale, 'results', 'نتيجة')}</small>{candidates.map((candidate) => <button key={candidate.id} type="button" className={`result-card ${selected?.id === candidate.id ? 'active' : ''}`} onClick={() => void chooseCandidate(candidate.id)}><span className="mini-avatar">{candidate.displayName.slice(0, 1)}</span><span><strong>{candidate.displayName}</strong><small>{candidate.headline || text(locale, 'Professional', 'مهني')} · {candidate.city}</small></span></button>)}</div>
         </aside>
 
         <section className="portrait-video recruiter-video-stage">
-          {selected?.introductionVideoUrl ? <HlsVideo src={selected.introductionVideoUrl} poster={selected.introductionVideoThumbnailUrl} className="discovery-video" /> : <div className="portrait-placeholder"><span>▶</span><b>{candidates.length ? text(locale, 'Loading Introduction Video…', 'جاري تحميل الفيديو التعريفي…') : text(locale, 'Search to discover candidates', 'ابحث لاكتشاف المرشحين')}</b></div>}
+          {selected?.introductionVideoEmbedUrl || selected?.introductionVideoUrl ? <StreamVideo embedUrl={selected.introductionVideoEmbedUrl} playbackUrl={selected.introductionVideoUrl} poster={selected.introductionVideoThumbnailUrl} className="discovery-video" /> : <div className="portrait-placeholder"><span>▶</span><b>{candidates.length ? text(locale, 'Loading Introduction Video…', 'جاري تحميل الفيديو التعريفي…') : text(locale, 'Search to discover candidates', 'ابحث لاكتشاف المرشحين')}</b></div>}
           {selected && <div className="video-caption"><span className="video-badge">30s {text(locale, 'Introduction Video', 'فيديو تعريفي')}</span><strong>{selected.displayName}</strong><small>{selected.headline}</small></div>}
         </section>
 
@@ -694,19 +749,18 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
           {!selected ? <div className="empty-state tall">{text(locale, 'Candidate details appear here.', 'ستظهر تفاصيل المرشح هنا.')}</div> : <>
             <span className="eyebrow">{text(locale, 'Candidate', 'مرشح')}</span><h1>{selected.displayName}</h1><h3>{selected.headline || text(locale, 'Professional candidate', 'مرشح مهني')}</h3><p className="muted">{selected.city}, {selected.countryCode} · {selected.yearsExperience} {text(locale, 'years experience', 'سنوات خبرة')}</p>
             {selected.professionalSummary && <p className="candidate-summary">{selected.professionalSummary}</p>}
-            <div className="evidence-row"><span>{selected.skillIds.length} {text(locale, 'skills', 'مهارات')}</span><span>{selected.certificates.length} {text(locale, 'certificates', 'شهادات')}</span><span>{selected.experience.length} {text(locale, 'roles', 'خبرات')}</span></div>
+            <div className="evidence-row"><span>{selected.skillIds.length} {text(locale, 'skills', 'مهارات')}</span><span>{selected.certificateCount} {text(locale, 'certificates', 'شهادات')}</span><span>{educationLabel(locale, selected.highestEducationLevel)}</span></div>
             <div className="action-stack">
-              <div className="inline-save"><select value={listId} onChange={(e) => setListId(e.target.value)}><option value="">{text(locale, 'Auto-create list', 'إنشاء قائمة تلقائياً')}</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><button className="button secondary" disabled={busy === 'save'} onClick={() => void saveCandidate()}>{text(locale, 'Save', 'حفظ')}</button></div>
+              <div className="save-list-controls"><select value={listId} onChange={(e) => { setListId(e.target.value); if (e.target.value) setNewListName(''); }}><option value="">{text(locale, 'Choose an existing list', 'اختر قائمة موجودة')}</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><span>{text(locale, 'or', 'أو')}</span><input value={newListName} disabled={Boolean(listId)} placeholder={text(locale, 'Enter a new list name', 'اكتب اسم قائمة جديدة')} onChange={(e) => setNewListName(e.target.value)} /><button className="button secondary" disabled={busy === 'save' || (!listId && !newListName.trim())} onClick={() => void saveCandidate()}>{text(locale, 'Save candidate', 'حفظ المرشح')}</button></div>
               <button className="button secondary full" disabled={busy === 'chat'} onClick={() => void startChat()}>{text(locale, 'Start Chat', 'بدء محادثة')}</button>
               {selected.cvOriginalFilename && <button className="button secondary full" disabled={busy === 'cv'} onClick={() => void downloadCandidateCv()}>{text(locale, 'Download CV', 'تنزيل السيرة الذاتية')}</button>}
               <button className="button primary full" onClick={() => { setInterviewForm((current) => ({ ...current, opportunityTitle: selected.headline || '' })); setShowInterview(true); }}>{t(locale, 'requestInterview')}</button>
             </div>
-            <details className="evidence-details"><summary>{text(locale, 'Open full professional evidence', 'عرض التفاصيل المهنية الكاملة')}</summary><div><h4>{text(locale, 'Experience', 'الخبرة')}</h4>{selected.experience.map((item, index) => <p key={index}>{String(item.jobTitle ?? '')} · {String(item.companyName ?? '')}</p>)}<h4>{text(locale, 'Education', 'التعليم')}</h4>{selected.education.map((item, index) => <p key={index}>{String(item.qualification ?? '')} · {String(item.institution ?? '')}</p>)}<h4>{text(locale, 'Certificates', 'الشهادات')}</h4>{selected.certificates.map((item, index) => <p key={index}>{String(item.name ?? '')}</p>)}</div></details>
           </>}
         </aside>
       </div>
 
-      {showInterview && selected && <div className="modal-backdrop" onMouseDown={() => setShowInterview(false)}><form className="modal-card" onSubmit={requestInterview} onMouseDown={(e) => e.stopPropagation()}><div className="panel-head"><div><span className="eyebrow">{text(locale, 'Interview request', 'طلب مقابلة')}</span><h2>{selected.displayName}</h2></div><button className="ghost" type="button" onClick={() => setShowInterview(false)}>✕</button></div><label>{text(locale, 'Role / opportunity title', 'المسمى / الفرصة')}<input required value={interviewForm.opportunityTitle} onChange={(e) => setInterviewForm({ ...interviewForm, opportunityTitle: e.target.value })} /></label><label>{text(locale, 'Date & time', 'التاريخ والوقت')}<input type="datetime-local" required value={interviewForm.startsAt} onChange={(e) => setInterviewForm({ ...interviewForm, startsAt: e.target.value })} /></label><div className="form-grid two"><label>{text(locale, 'Duration', 'المدة')}<select value={interviewForm.durationMinutes} onChange={(e) => setInterviewForm({ ...interviewForm, durationMinutes: Number(e.target.value) })}><option value={20}>20 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option></select></label><label>{text(locale, 'Type', 'النوع')}<select value={interviewForm.meetingType} onChange={(e) => setInterviewForm({ ...interviewForm, meetingType: e.target.value as Interview['meetingType'] })}><option value="google_meet">Google Meet</option><option value="video_call">{text(locale, 'Video call', 'مكالمة فيديو')}</option><option value="in_person">{text(locale, 'In person', 'حضوري')}</option></select></label></div>{interviewForm.meetingType === 'in_person' && <label>{text(locale, 'Location', 'الموقع')}<input required value={interviewForm.location} onChange={(e) => setInterviewForm({ ...interviewForm, location: e.target.value })} /></label>}<label>{text(locale, 'Message', 'رسالة')}<textarea rows={3} value={interviewForm.message} onChange={(e) => setInterviewForm({ ...interviewForm, message: e.target.value })} /></label><button className="button primary full" disabled={busy === 'interview'}>{text(locale, 'Send interview request', 'إرسال طلب المقابلة')}</button></form></div>}
+      {showInterview && selected && <div className="modal-backdrop" onMouseDown={() => setShowInterview(false)}><form className="modal-card" onSubmit={requestInterview} onMouseDown={(e) => e.stopPropagation()}><div className="panel-head"><div><span className="eyebrow">{text(locale, 'Interview request', 'طلب مقابلة')}</span><h2>{selected.displayName}</h2></div><button className="ghost" type="button" onClick={() => setShowInterview(false)}>✕</button></div><label>{text(locale, 'Role / opportunity title', 'المسمى / الفرصة')}<input required value={interviewForm.opportunityTitle} onChange={(e) => setInterviewForm({ ...interviewForm, opportunityTitle: e.target.value })} /></label><label>{text(locale, 'Date & time', 'التاريخ والوقت')}<input type="datetime-local" required value={interviewForm.startsAt} onChange={(e) => setInterviewForm({ ...interviewForm, startsAt: e.target.value })} /></label><div className="form-grid two"><label>{text(locale, 'Duration', 'المدة')}<select value={interviewForm.durationMinutes} onChange={(e) => setInterviewForm({ ...interviewForm, durationMinutes: Number(e.target.value) })}><option value={20}>20 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option></select></label><label>{text(locale, 'Type', 'النوع')}<select value={interviewForm.meetingType} onChange={(e) => setInterviewForm({ ...interviewForm, meetingType: e.target.value as Interview['meetingType'] })}><option value="video_call">{text(locale, 'Video call — arrange link in chat', 'مكالمة فيديو — يتم ترتيب الرابط في المحادثة')}</option><option value="in_person">{text(locale, 'In person', 'حضوري')}</option></select></label></div>{interviewForm.meetingType === 'video_call' && <p className="tiny muted">{text(locale, 'Google Meet is temporarily unavailable. Send the meeting link to the candidate in CVIDEO chat.', 'Google Meet غير متاح مؤقتاً. أرسل رابط الاجتماع إلى المرشح عبر محادثة CVIDEO.')}</p>}{interviewForm.meetingType === 'in_person' && <label>{text(locale, 'Location', 'الموقع')}<input required value={interviewForm.location} onChange={(e) => setInterviewForm({ ...interviewForm, location: e.target.value })} /></label>}<label>{text(locale, 'Message', 'رسالة')}<textarea rows={3} value={interviewForm.message} onChange={(e) => setInterviewForm({ ...interviewForm, message: e.target.value })} /></label><button className="button primary full" disabled={busy === 'interview'}>{text(locale, 'Send interview request', 'إرسال طلب المقابلة')}</button></form></div>}
     </AppShell>
   );
 }
@@ -725,7 +779,7 @@ function SavedListsPage({ locale, setLocale }: { locale: Locale; setLocale: (loc
 
   async function create(event: FormEvent) {
     event.preventDefault(); if (!newName.trim()) return;
-    try { const created = await api.createSavedList(newName.trim()); setNewName(''); setLists((current) => [created, ...current]); setSelected(created); }
+    try { const created = await api.createSavedList(newName.trim()); setNewName(''); setLists((current) => current.some((list) => list.id === created.id) ? current.map((list) => list.id === created.id ? created : list) : [created, ...current]); setSelected(created); }
     catch (err) { setError(errorMessage(err)); }
   }
 
@@ -733,7 +787,57 @@ function SavedListsPage({ locale, setLocale }: { locale: Locale; setLocale: (loc
     try { setSelected(await api.getSavedList(id)); } catch (err) { setError(errorMessage(err)); }
   }
 
-  return <AppShell locale={locale} setLocale={setLocale}><PageHead eyebrow={text(locale, 'Saved Lists', 'القوائم المحفوظة')} title={text(locale, 'Organize people, not applications', 'نظّم الأشخاص، لا طلبات التوظيف')} description={text(locale, 'Saved Lists are private company collections, never ATS stages.', 'القوائم المحفوظة مجموعات خاصة بالشركة وليست مراحل توظيف.')}/>{error && <div className="notice error">{error}</div>}<div className="saved-layout"><section className="panel"><form className="inline-form" onSubmit={create}><input placeholder={text(locale, 'New list name', 'اسم قائمة جديدة')} value={newName} onChange={(e) => setNewName(e.target.value)} /><button className="button primary">＋</button></form><div className="list-stack">{lists.map((list) => <button className={`saved-list-card ${selected?.id === list.id ? 'active' : ''}`} key={list.id} onClick={() => void openList(list.id)}><div><strong>{list.name}</strong><small>{list.description || text(locale, 'Candidate collection', 'مجموعة مرشحين')}</small></div><b>{list.candidateCount}</b></button>)}</div></section><section className="panel"><span className="eyebrow">{text(locale, 'Selected list', 'القائمة المختارة')}</span><h2>{selected?.name || text(locale, 'Choose a list', 'اختر قائمة')}</h2>{selected?.candidateIds?.length ? <div className="candidate-id-list">{selected.candidateIds.map((id) => <div key={id}><span className="mini-avatar">C</span><code>{id}</code></div>)}</div> : <div className="empty-state">{text(locale, 'Save candidates from Search and they will appear here.', 'احفظ المرشحين من البحث وسيظهرون هنا.')}</div>}</section></div></AppShell>;
+  async function removeCandidate(candidateId: string) {
+    if (!selected) return;
+    try {
+      await api.removeCandidateFromList(selected.id, candidateId);
+      const refreshed = await api.getSavedList(selected.id);
+      setSelected(refreshed);
+      setLists((current) => current.map((list) => list.id === refreshed.id ? { ...list, candidateCount: refreshed.candidateCount } : list));
+    } catch (err) { setError(errorMessage(err)); }
+  }
+
+  return <AppShell locale={locale} setLocale={setLocale}><PageHead eyebrow={text(locale, 'Saved Lists', 'القوائم المحفوظة')} title={text(locale, 'Organize people, not applications', 'نظّم الأشخاص، لا طلبات التوظيف')} description={text(locale, 'Saved Lists are private company collections, never ATS stages.', 'القوائم المحفوظة مجموعات خاصة بالشركة وليست مراحل توظيف.')}/>{error && <div className="notice error">{error}</div>}<div className="saved-layout"><section className="panel"><form className="inline-form" onSubmit={create}><input placeholder={text(locale, 'New list name', 'اسم قائمة جديدة')} value={newName} onChange={(e) => setNewName(e.target.value)} /><button className="button primary">＋</button></form><div className="list-stack">{lists.map((list) => <button className={`saved-list-card ${selected?.id === list.id ? 'active' : ''}`} key={list.id} onClick={() => void openList(list.id)}><div><strong>{list.name}</strong><small>{list.description || text(locale, 'Candidate collection', 'مجموعة مرشحين')}</small></div><b>{list.candidateCount}</b></button>)}</div></section><section className="panel"><span className="eyebrow">{text(locale, 'Selected list', 'القائمة المختارة')}</span><h2>{selected?.name || text(locale, 'Choose a list', 'اختر قائمة')}</h2>{selected?.candidates?.length ? <div className="saved-candidate-list">{selected.candidates.map((candidate) => <article key={candidate.id}><span className="mini-avatar">{candidate.displayName.slice(0, 1)}</span><div><strong>{candidate.displayName}</strong><small>{candidate.headline || text(locale, 'Professional candidate', 'مرشح مهني')} · {candidate.city}, {candidate.countryCode}</small></div><div className="actions compact-actions"><Link className="button secondary small" to={`/recruiter/search?candidateId=${encodeURIComponent(candidate.id)}`}>{text(locale, 'View profile', 'عرض الملف')}</Link><button type="button" className="ghost small" onClick={() => void removeCandidate(candidate.id)}>{text(locale, 'Remove', 'إزالة')}</button></div></article>)}</div> : <div className="empty-state">{text(locale, 'Save candidates from Search and they will appear here.', 'احفظ المرشحين من البحث وسيظهرون هنا.')}</div>}</section></div></AppShell>;
+}
+
+function CompanyInterviewsPage({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
+  const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+
+  async function load() {
+    setError('');
+    try { setInterviews(await api.listInterviews()); } catch (err) { setError(errorMessage(err)); }
+  }
+  useEffect(() => { void load(); }, []);
+
+  async function cancel(interview: Interview) {
+    if (!window.confirm(text(locale, 'Cancel this interview request?', 'إلغاء طلب المقابلة؟'))) return;
+    setBusy(interview.id); setError('');
+    try { await api.cancelInterview(interview.id); await load(); } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  function statusLabel(status: Interview['status']) {
+    const labels: Record<Interview['status'], [string, string]> = {
+      pending: ['Sent — awaiting candidate', 'تم الإرسال — بانتظار المرشح'],
+      accepted: ['Accepted', 'مقبول'],
+      suggested_time: ['Candidate suggested another time', 'اقترح المرشح موعداً آخر'],
+      declined: ['Declined', 'مرفوض'],
+      cancelled: ['Cancelled', 'ملغي'],
+    };
+    return text(locale, ...labels[status]);
+  }
+
+  return <AppShell locale={locale} setLocale={setLocale}>
+    <PageHead eyebrow={text(locale, 'Company interviews', 'مقابلات الشركة')} title={text(locale, 'Interview requests and status', 'طلبات المقابلات وحالتها')} description={text(locale, 'Every request sent by your company appears here and updates when the candidate responds.', 'يظهر هنا كل طلب ترسله شركتك وتتحدث حالته عند رد المرشح.')} />
+    {error && <div className="notice error">{error}</div>}
+    <section className="panel interviews-panel">
+      {interviews.length === 0 ? <div className="empty-state tall">{text(locale, 'No interview requests have been sent yet.', 'لم يتم إرسال طلبات مقابلة بعد.')}</div> : interviews.map((interview) => <article className="interview-row" key={interview.id}>
+        <div><span className={`status ${interview.status}`}>{statusLabel(interview.status)}</span><h3>{interview.candidateDisplayName || text(locale, 'Candidate', 'المرشح')}</h3><strong>{interview.opportunityTitle}</strong><p>{new Date(interview.startsAtUtc).toLocaleString(locale === 'ar' ? 'ar-JO' : 'en-GB')} · {interview.durationMinutes} min</p>{interview.message && <small>{interview.message}</small>}{interview.suggestedStartsAtUtc && <p>{text(locale, 'Suggested:', 'الموعد المقترح:')} {new Date(interview.suggestedStartsAtUtc).toLocaleString(locale === 'ar' ? 'ar-JO' : 'en-GB')}</p>}</div>
+        <div className="actions compact-actions"><Link className="button secondary small" to={`/recruiter/search?candidateId=${encodeURIComponent(interview.candidateId)}`}>{text(locale, 'View candidate', 'عرض المرشح')}</Link>{['pending', 'accepted', 'suggested_time'].includes(interview.status) && <button type="button" className="ghost small" disabled={busy === interview.id} onClick={() => void cancel(interview)}>{text(locale, 'Cancel request', 'إلغاء الطلب')}</button>}</div>
+      </article>)}
+    </section>
+  </AppShell>;
 }
 
 function MessagesPage({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
@@ -890,6 +994,7 @@ export function App() {
       <Route path="/candidate/messages" element={<RequireRole roles={['candidate']}><MessagesPage locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/recruiter/search" element={<RequireRole roles={companyRoles}><RecruiterSearch locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/recruiter/saved-lists" element={<RequireRole roles={companyRoles}><SavedListsPage locale={locale} setLocale={setLocale} /></RequireRole>} />
+      <Route path="/recruiter/interviews" element={<RequireRole roles={companyRoles}><CompanyInterviewsPage locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/recruiter/messages" element={<RequireRole roles={companyRoles}><MessagesPage locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/recruiter/account" element={<RequireRole roles={companyRoles}><CompanyAccount locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/admin" element={<RequireRole roles={['super_admin']}><AdminPage locale={locale} setLocale={setLocale} /></RequireRole>} />

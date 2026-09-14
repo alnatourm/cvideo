@@ -1,0 +1,37 @@
+-- Seed the candidate language selector with a practical bilingual catalog.
+INSERT INTO languages (code, name_en, name_ar, is_active)
+VALUES
+  ('ar', 'Arabic', 'العربية', TRUE),
+  ('en', 'English', 'الإنجليزية', TRUE),
+  ('fr', 'French', 'الفرنسية', TRUE),
+  ('es', 'Spanish', 'الإسبانية', TRUE),
+  ('de', 'German', 'الألمانية', TRUE),
+  ('it', 'Italian', 'الإيطالية', TRUE),
+  ('pt', 'Portuguese', 'البرتغالية', TRUE),
+  ('tr', 'Turkish', 'التركية', TRUE),
+  ('fa', 'Persian', 'الفارسية', TRUE),
+  ('ku', 'Kurdish', 'الكردية', TRUE),
+  ('ur', 'Urdu', 'الأردية', TRUE),
+  ('ps', 'Pashto', 'البشتوية', TRUE),
+  ('hi', 'Hindi', 'الهندية', TRUE),
+  ('bn', 'Bengali', 'البنغالية', TRUE),
+  ('ne', 'Nepali', 'النيبالية', TRUE),
+  ('si', 'Sinhala', 'السنهالية', TRUE),
+  ('zh', 'Chinese', 'الصينية', TRUE),
+  ('ja', 'Japanese', 'اليابانية', TRUE),
+  ('ko', 'Korean', 'الكورية', TRUE),
+  ('ru', 'Russian', 'الروسية', TRUE),
+  ('uk', 'Ukrainian', 'الأوكرانية', TRUE),
+  ('nl', 'Dutch', 'الهولندية', TRUE),
+  ('pl', 'Polish', 'البولندية', TRUE),
+  ('ro', 'Romanian', 'الرومانية', TRUE),
+  ('el', 'Greek', 'اليونانية', TRUE),
+  ('sv', 'Swedish', 'السويدية', TRUE),
+  ('sw', 'Swahili', 'السواحيلية', TRUE),
+  ('id', 'Indonesian', 'الإندونيسية', TRUE),
+  ('ms', 'Malay', 'الملايوية', TRUE),
+  ('tl', 'Filipino', 'الفلبينية', TRUE)
+ON CONFLICT (code) DO UPDATE SET
+  name_en = EXCLUDED.name_en,
+  name_ar = EXCLUDED.name_ar,
+  is_active = EXCLUDED.is_active;

@@ -14,6 +14,13 @@ export interface SavedListSummary {
 
 export interface SavedListDetail extends SavedListSummary {
   candidateIds: string[];
+  candidates?: Array<{
+    id: string;
+    displayName: string;
+    headline: string | null;
+    city: string;
+    countryCode: string;
+  }>;
 }
 
 export type AddCandidateResult = 'ok' | 'list_not_found' | 'candidate_not_found';

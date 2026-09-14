@@ -78,22 +78,20 @@ export class InterviewsService {
 
     let meeting: { provider: string; externalId: string; joinUrl: string } | undefined;
     if (interview.meetingType === 'google_meet') {
-      if (!this.googleMeetProvider) {
-        throw new InterviewsError('MEETING_PROVIDER_NOT_CONFIGURED', 503, 'Google Meet provider is not configured');
-      }
-      try {
-        meeting = await this.googleMeetProvider.createMeeting({
-          requestId: interview.id,
-          title: interview.opportunityTitle,
-          startsAtUtc: interview.startsAtUtc,
-          durationMinutes: interview.durationMinutes,
-          timezone: interview.timezone,
-        });
-      } catch (error) {
-        if (error instanceof Error && error.message === 'GOOGLE_MEET_NOT_CONFIGURED') {
-          throw new InterviewsError('MEETING_PROVIDER_NOT_CONFIGURED', 503, 'Google Meet provider is not configured');
+      if (this.googleMeetProvider) {
+        try {
+          meeting = await this.googleMeetProvider.createMeeting({
+            requestId: interview.id,
+            title: interview.opportunityTitle,
+            startsAtUtc: interview.startsAtUtc,
+            durationMinutes: interview.durationMinutes,
+            timezone: interview.timezone,
+          });
+        } catch (error) {
+          if (!(error instanceof Error && error.message === 'GOOGLE_MEET_NOT_CONFIGURED')) {
+            throw error;
+          }
         }
-        throw error;
       }
     }
 
