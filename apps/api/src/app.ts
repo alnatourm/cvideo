@@ -58,7 +58,13 @@ export function createApp(options: AppOptions = {}) {
 
   app.disable('x-powered-by');
   if (options.trustProxyHops !== undefined) app.set('trust proxy', options.trustProxyHops);
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        frameSrc: ["'self'", 'https://iframe.mediadelivery.net'],
+      },
+    },
+  }));
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 

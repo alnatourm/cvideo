@@ -12,6 +12,13 @@ describe('CVIDEO API foundation', () => {
     expect(response.body).toEqual({ status: 'ok', service: 'cvideo-api', version: 'v1' });
   });
 
+  it('allows the Bunny Stream player in the content security policy', async () => {
+    const response = await request(createApp()).get('/api/v1/health');
+    expect(response.headers['content-security-policy']).toContain(
+      "frame-src 'self' https://iframe.mediadelivery.net",
+    );
+  });
+
   it('returns the canonical error envelope for unknown routes', async () => {
     const response = await request(createApp()).get('/api/v1/unknown');
     expect(response.status).toBe(404);
