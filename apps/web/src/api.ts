@@ -11,6 +11,37 @@ export interface Principal {
   clientType: 'web' | 'mobile';
 }
 
+export interface CandidateExperience {
+  id: string;
+  companyName: string;
+  jobTitle: string;
+  location: string | null;
+  startDate: string;
+  endDate: string | null;
+  isCurrent: boolean;
+  description: string | null;
+}
+
+export interface CandidateEducation {
+  id: string;
+  institution: string;
+  qualification: string;
+  fieldOfStudy: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  description: string | null;
+}
+
+export interface CandidateCertificate {
+  id: string;
+  name: string;
+  issuingOrganization: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  credentialId?: string | null;
+  credentialUrl: string | null;
+}
+
 export interface CandidateProfile {
   id: string;
   displayName: string;
@@ -21,15 +52,17 @@ export interface CandidateProfile {
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   yearsExperience: number;
+  certificateCount: number;
+  highestEducationLevel: 'none' | 'high_school' | 'vocational' | 'diploma' | 'bachelor' | 'master' | 'doctorate' | 'professor';
   professionalSummary: string | null;
   cvOriginalFilename: string | null;
   extraSubfieldIds: string[];
   preferredRoleIds: string[];
   skillIds: string[];
   languageIds: string[];
-  experience: Array<Record<string, unknown>>;
-  education: Array<Record<string, unknown>>;
-  certificates: Array<Record<string, unknown>>;
+  experience: CandidateExperience[];
+  education: CandidateEducation[];
+  certificates: CandidateCertificate[];
   video: CandidateVideo | null;
 }
 
@@ -37,6 +70,7 @@ export interface CandidateVideo {
   id: string;
   status: 'pending' | 'uploading' | 'processing' | 'ready' | 'rejected' | 'failed';
   playbackUrl?: string | null;
+  embedUrl?: string | null;
   thumbnailUrl?: string | null;
   originalFilename?: string | null;
   mimeType?: string | null;
@@ -52,10 +86,13 @@ export interface CandidateSearchItem {
   countryCode: string;
   city: string;
   yearsExperience: number;
+  certificateCount: number;
+  highestEducationLevel: CandidateProfile['highestEducationLevel'];
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   introductionVideoId: string;
   introductionVideoUrl: string | null;
+  introductionVideoEmbedUrl?: string | null;
   introductionVideoThumbnailUrl: string | null;
 }
 
@@ -70,9 +107,9 @@ export interface CandidateDetail extends CandidateSearchItem {
   preferredRoleIds: string[];
   skillIds: string[];
   languageIds: string[];
-  certificates: Array<Record<string, unknown>>;
-  experience: Array<Record<string, unknown>>;
-  education: Array<Record<string, unknown>>;
+  certificates: CandidateCertificate[];
+  experience: CandidateExperience[];
+  education: CandidateEducation[];
 }
 
 export interface SavedList {
@@ -81,6 +118,7 @@ export interface SavedList {
   description: string | null;
   candidateCount: number;
   candidateIds?: string[];
+  candidates?: Array<Pick<CandidateSearchItem, 'id' | 'displayName' | 'headline' | 'city' | 'countryCode'>>;
   createdAt: string;
   updatedAt: string;
 }
@@ -108,6 +146,7 @@ export interface Interview {
   id: string;
   companyId: string;
   candidateId: string;
+  candidateDisplayName?: string;
   requestedByUserId: string;
   opportunityTitle: string;
   startsAtUtc: string;
@@ -260,15 +299,21 @@ export const api = {
 
   getCandidateProfile: () => apiRequest<CandidateProfile>('/api/v1/candidate/profile'),
   updateCandidateProfile: (input: unknown) => apiRequest<CandidateProfile>('/api/v1/candidate/profile', { method: 'PUT', body: jsonBody(input) }),
+  createCandidateExperience: (input: Omit<CandidateExperience, 'id'>) => apiRequest<CandidateExperience>('/api/v1/candidate/experience', { method: 'POST', body: jsonBody(input) }),
+  deleteCandidateExperience: (id: string) => apiRequest<void>(`/api/v1/candidate/experience/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createCandidateEducation: (input: Omit<CandidateEducation, 'id'>) => apiRequest<CandidateEducation>('/api/v1/candidate/education', { method: 'POST', body: jsonBody(input) }),
+  deleteCandidateEducation: (id: string) => apiRequest<void>(`/api/v1/candidate/education/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createCandidateCertificate: (input: Omit<CandidateCertificate, 'id'>) => apiRequest<CandidateCertificate>('/api/v1/candidate/certificates', { method: 'POST', body: jsonBody(input) }),
+  deleteCandidateCertificate: (id: string) => apiRequest<void>(`/api/v1/candidate/certificates/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   getProfileCompleteness: () => apiRequest<{ completed: number; total: number; percent: number }>('/api/v1/candidate/profile/completeness'),
   getVisibility: () => apiRequest<{ discoverable: boolean; ready?: boolean; missing?: string[] }>('/api/v1/candidate/visibility'),
   setVisibility: (discoverable: boolean) => apiRequest<{ discoverable: boolean }>('/api/v1/candidate/visibility', { method: 'PUT', body: jsonBody({ discoverable }) }),
   getCandidateVideo: () => apiRequest<CandidateVideo | null>('/api/v1/candidate/video'),
   startCandidateVideo: (input: { filename: string; mimeType: string; sizeBytes: number; durationSeconds: number; height?: number }) =>
     apiRequest<CandidateVideo & { uploadPath: string; maxBytes: number }>('/api/v1/candidate/video/start', { method: 'POST', body: jsonBody(input) }),
-  uploadCandidateVideo: (file: File) => apiRequest<CandidateVideo>('/api/v1/candidate/video/content', {
+  uploadCandidateVideo: (file: File, mimeType = file.type) => apiRequest<CandidateVideo>('/api/v1/candidate/video/content', {
     method: 'PUT',
-    headers: { 'content-type': file.type },
+    headers: { 'content-type': mimeType },
     body: file,
   }),
   syncCandidateVideo: () => apiRequest<CandidateVideo>('/api/v1/candidate/video/sync', { method: 'POST' }),
@@ -302,10 +347,21 @@ export const api = {
   acceptInterview: (id: string) => apiRequest<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/accept`, { method: 'POST' }),
   declineInterview: (id: string, message?: string) => apiRequest<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/decline`, { method: 'POST', body: jsonBody({ message }) }),
   suggestInterviewTime: (id: string, startsAtUtc: string, timezone: string, message?: string) => apiRequest<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/suggest-time`, { method: 'POST', body: jsonBody({ startsAtUtc, timezone, message }) }),
+  cancelInterview: (id: string) => apiRequest<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
 
   categories: () => apiRequest<TaxonomyItem[]>('/api/v1/taxonomy/categories'),
   subcategories: (categoryId: string) => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/categories/${encodeURIComponent(categoryId)}/subcategories`),
-  jobTitles: (q = '') => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/job-titles?q=${encodeURIComponent(q)}`),
-  skills: (q = '') => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/skills?q=${encodeURIComponent(q)}`),
+  jobTitles: (q = '', subcategoryId?: string | null) => {
+    const params = new URLSearchParams();
+    if (q.trim()) params.set('q', q.trim());
+    if (subcategoryId) params.set('subcategoryId', subcategoryId);
+    return apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/job-titles?${params.toString()}`);
+  },
+  skills: (q = '', jobTitleIds: string[] = []) => {
+    const params = new URLSearchParams();
+    if (q.trim()) params.set('q', q.trim());
+    if (jobTitleIds.length) params.set('jobTitleIds', jobTitleIds.join(','));
+    return apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/skills?${params.toString()}`);
+  },
   languages: () => apiRequest<TaxonomyItem[]>('/api/v1/taxonomy/languages'),
 };

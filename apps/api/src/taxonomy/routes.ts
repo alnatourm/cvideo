@@ -12,6 +12,11 @@ function single(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function commaSeparated(value: unknown): string[] | undefined {
+  const raw = single(value)?.trim();
+  return raw ? raw.split(',').map((item) => item.trim()).filter(Boolean) : undefined;
+}
+
 export function createTaxonomyRouter(service: TaxonomyService) {
   const router = Router();
 
@@ -24,11 +29,19 @@ export function createTaxonomyRouter(service: TaxonomyService) {
   }));
 
   router.get('/job-titles', asyncHandler(async (req, res) => {
-    res.json({ data: await service.listJobTitles({ q: single(req.query.q), limit: single(req.query.limit) }) });
+    res.json({ data: await service.listJobTitles({
+      q: single(req.query.q),
+      limit: single(req.query.limit),
+      subcategoryId: single(req.query.subcategoryId),
+    }) });
   }));
 
   router.get('/skills', asyncHandler(async (req, res) => {
-    res.json({ data: await service.listSkills({ q: single(req.query.q), limit: single(req.query.limit) }) });
+    res.json({ data: await service.listSkills({
+      q: single(req.query.q),
+      limit: single(req.query.limit),
+      jobTitleIds: commaSeparated(req.query.jobTitleIds),
+    }) });
   }));
 
   router.get('/languages', asyncHandler(async (_req, res) => {

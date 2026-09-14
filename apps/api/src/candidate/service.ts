@@ -32,7 +32,8 @@ export class CandidateService {
       Boolean(profile.primaryCategoryId && profile.primarySubcategoryId),
       profile.preferredRoleIds.length > 0,
       profile.skillIds.length > 0,
-      profile.experience.length > 0,
+      profile.yearsExperience >= 0,
+      profile.highestEducationLevel !== 'none',
       Boolean(profile.professionalSummary),
       profile.video?.status === 'ready',
     ];

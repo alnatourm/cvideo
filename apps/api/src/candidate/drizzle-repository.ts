@@ -133,6 +133,8 @@ export class DrizzleCandidateRepository implements CandidateRepository {
       primaryCategoryId: profile.primaryCategoryId,
       primarySubcategoryId: profile.primarySubcategoryId,
       yearsExperience: profile.yearsExperience,
+      certificateCount: profile.certificateCount,
+      highestEducationLevel: profile.highestEducationLevel as CandidateOwnProfile['highestEducationLevel'],
       professionalSummary: profile.professionalSummary,
       cvOriginalFilename: profile.cvOriginalFilename,
       extraSubfieldIds: extraRows.map((row) => row.id),
@@ -166,6 +168,8 @@ export class DrizzleCandidateRepository implements CandidateRepository {
           primaryCategoryId: input.primaryCategoryId ?? null,
           primarySubcategoryId: input.primarySubcategoryId ?? null,
           yearsExperience: input.yearsExperience,
+          certificateCount: input.certificateCount,
+          highestEducationLevel: input.highestEducationLevel,
           professionalSummary: input.professionalSummary ?? null,
           updatedAt: new Date(),
         })
@@ -174,21 +178,27 @@ export class DrizzleCandidateRepository implements CandidateRepository {
 
       if (!profile) return null;
 
-      await Promise.all([
-        tx.delete(candidateExtraSubfields).where(eq(candidateExtraSubfields.candidateId, profile.id)),
-        tx.delete(candidatePreferredRoles).where(eq(candidatePreferredRoles.candidateId, profile.id)),
-        tx.delete(candidateSkills).where(eq(candidateSkills.candidateId, profile.id)),
-        tx.delete(candidateLanguages).where(eq(candidateLanguages.candidateId, profile.id)),
-      ]);
+      await tx.delete(candidateExtraSubfields).where(eq(candidateExtraSubfields.candidateId, profile.id));
+      await tx.delete(candidatePreferredRoles).where(eq(candidatePreferredRoles.candidateId, profile.id));
+      await tx.delete(candidateSkills).where(eq(candidateSkills.candidateId, profile.id));
+      await tx.delete(candidateLanguages).where(eq(candidateLanguages.candidateId, profile.id));
 
       if (input.extraSubfieldIds.length) {
         await tx.insert(candidateExtraSubfields).values(
-          input.extraSubfieldIds.map((subcategoryId, position) => ({ candidateId: profile.id, subcategoryId, position })),
+          input.extraSubfieldIds.map((subcategoryId, index) => ({
+            candidateId: profile.id,
+            subcategoryId,
+            position: index + 1,
+          })),
         );
       }
       if (input.preferredRoleIds.length) {
         await tx.insert(candidatePreferredRoles).values(
-          input.preferredRoleIds.map((jobTitleId, position) => ({ candidateId: profile.id, jobTitleId, position })),
+          input.preferredRoleIds.map((jobTitleId, index) => ({
+            candidateId: profile.id,
+            jobTitleId,
+            position: index + 1,
+          })),
         );
       }
       if (input.skillIds.length) {

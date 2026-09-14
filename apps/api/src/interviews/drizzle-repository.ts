@@ -12,11 +12,12 @@ import type {
   InterviewsRepository,
 } from './repository.js';
 
-function mapInterview(row: typeof interviews.$inferSelect): InterviewRecord {
+function mapInterview(row: typeof interviews.$inferSelect, candidateDisplayName?: string): InterviewRecord {
   return {
     id: row.id,
     companyId: row.companyId,
     candidateId: row.candidateId,
+    candidateDisplayName,
     requestedByUserId: row.requestedByUserId,
     opportunityTitle: row.opportunityTitle,
     startsAtUtc: row.startsAtUtc,
@@ -46,7 +47,7 @@ export class DrizzleInterviewsRepository implements InterviewsRepository {
     input: InterviewCreateInput,
   ): Promise<CreateInterviewResult> {
     const [candidate] = await this.db
-      .select({ id: candidateProfiles.id })
+      .select({ id: candidateProfiles.id, displayName: candidateProfiles.displayName })
       .from(candidateProfiles)
       .innerJoin(candidateDiscoverySettings, eq(candidateDiscoverySettings.candidateId, candidateProfiles.id))
       .innerJoin(candidateVideos, eq(candidateVideos.candidateId, candidateProfiles.id))
@@ -76,31 +77,31 @@ export class DrizzleInterviewsRepository implements InterviewsRepository {
       })
       .returning();
     if (!row) throw new Error('Failed to create interview request');
-    return { kind: 'created', interview: mapInterview(row) };
+    return { kind: 'created', interview: mapInterview(row, candidate.displayName) };
   }
 
   async listForActor(actor: InterviewActor): Promise<InterviewRecord[]> {
     const query = this.db
-      .select({ interview: interviews })
+      .select({ interview: interviews, candidateDisplayName: candidateProfiles.displayName })
       .from(interviews)
       .innerJoin(candidateProfiles, eq(candidateProfiles.id, interviews.candidateId));
 
     const rows = actor.companyId
       ? await query.where(eq(interviews.companyId, actor.companyId)).orderBy(asc(interviews.startsAtUtc))
       : await query.where(eq(candidateProfiles.userId, actor.userId)).orderBy(asc(interviews.startsAtUtc));
-    return rows.map((row) => mapInterview(row.interview));
+    return rows.map((row) => mapInterview(row.interview, row.candidateDisplayName));
   }
 
   async getForActor(actor: InterviewActor, interviewId: string): Promise<InterviewRecord | null> {
     const query = this.db
-      .select({ interview: interviews })
+      .select({ interview: interviews, candidateDisplayName: candidateProfiles.displayName })
       .from(interviews)
       .innerJoin(candidateProfiles, eq(candidateProfiles.id, interviews.candidateId));
 
     const [row] = actor.companyId
       ? await query.where(and(eq(interviews.id, interviewId), eq(interviews.companyId, actor.companyId))).limit(1)
       : await query.where(and(eq(interviews.id, interviewId), eq(candidateProfiles.userId, actor.userId))).limit(1);
-    return row ? mapInterview(row.interview) : null;
+    return row ? mapInterview(row.interview, row.candidateDisplayName) : null;
   }
 
   async candidateRespond(

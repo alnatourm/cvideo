@@ -161,6 +161,22 @@ describe('Saved Lists API', () => {
     expect(foreignRead.body.error.code).toBe('LIST_NOT_FOUND');
   });
 
+  it('reuses a company list when the same name is entered again', async () => {
+    const auth = new AuthService(new MemoryAuthRepository());
+    const repository = new MemorySavedListsRepository();
+    const app = createApp({ authService: auth, savedListsService: new SavedListsService(repository), secureCookies: false });
+    const token = await registerCompany(app, 'owner-dedupe@example.com', 'CR-DEDUPE');
+
+    const first = await request(app).post('/api/v1/saved-lists').set('authorization', `Bearer ${token}`).send({ name: 'Sales Leaders' });
+    const second = await request(app).post('/api/v1/saved-lists').set('authorization', `Bearer ${token}`).send({ name: ' sales leaders ' });
+    const listed = await request(app).get('/api/v1/saved-lists').set('authorization', `Bearer ${token}`);
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(second.body.data.id).toBe(first.body.data.id);
+    expect(listed.body.data).toHaveLength(1);
+  });
+
   it('blocks candidate accounts from company Saved Lists', async () => {
     const auth = new AuthService(new MemoryAuthRepository());
     const app = createApp({ authService: auth, savedListsService: new SavedListsService(new MemorySavedListsRepository()), secureCookies: false });

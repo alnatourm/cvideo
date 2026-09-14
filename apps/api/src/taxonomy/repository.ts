@@ -8,7 +8,7 @@ export interface TaxonomyItem {
 export interface TaxonomyRepository {
   listCategories(): Promise<TaxonomyItem[]>;
   listSubcategories(categoryId: string): Promise<TaxonomyItem[]>;
-  listJobTitles(query: string | undefined, limit: number): Promise<TaxonomyItem[]>;
-  listSkills(query: string | undefined, limit: number): Promise<TaxonomyItem[]>;
+  listJobTitles(query: string | undefined, limit: number, subcategoryId?: string): Promise<TaxonomyItem[]>;
+  listSkills(query: string | undefined, limit: number, jobTitleIds?: string[]): Promise<TaxonomyItem[]>;
   listLanguages(): Promise<TaxonomyItem[]>;
 }

@@ -46,8 +46,15 @@ export class DrizzleSavedListsRepository implements SavedListsRepository {
     if (!row) return null;
 
     const candidates = await this.db
-      .select({ candidateId: savedCandidates.candidateId })
+      .select({
+        candidateId: savedCandidates.candidateId,
+        displayName: candidateProfiles.displayName,
+        headline: candidateProfiles.headline,
+        city: candidateProfiles.city,
+        countryCode: candidateProfiles.countryCode,
+      })
       .from(savedCandidates)
+      .innerJoin(candidateProfiles, eq(candidateProfiles.id, savedCandidates.candidateId))
       .where(eq(savedCandidates.listId, listId))
       .orderBy(desc(savedCandidates.createdAt));
 
@@ -55,6 +62,13 @@ export class DrizzleSavedListsRepository implements SavedListsRepository {
       ...row,
       candidateCount: candidates.length,
       candidateIds: candidates.map((candidate) => candidate.candidateId),
+      candidates: candidates.map((candidate) => ({
+        id: candidate.candidateId,
+        displayName: candidate.displayName,
+        headline: candidate.headline,
+        city: candidate.city,
+        countryCode: candidate.countryCode,
+      })),
     };
   }
 
@@ -67,8 +81,20 @@ export class DrizzleSavedListsRepository implements SavedListsRepository {
         name: input.name,
         description: input.description ?? null,
       })
+      .onConflictDoNothing()
       .returning({ id: savedLists.id });
-    if (!row) throw new Error('Failed to create saved list');
+    if (!row) {
+      const [existing] = await this.db
+        .select({ id: savedLists.id })
+        .from(savedLists)
+        .where(and(eq(savedLists.companyId, companyId), sql`lower(btrim(${savedLists.name})) = lower(btrim(${input.name}))`))
+        .limit(1);
+      if (existing) {
+        const detail = await this.get(companyId, existing.id);
+        if (detail) return detail;
+      }
+      throw new Error('Failed to create saved list');
+    }
     const created = await this.get(companyId, row.id);
     if (!created) throw new Error('Failed to read created saved list');
     return created;

@@ -1,4 +1,6 @@
 import { createApp } from './app.js';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { DrizzleCompanyVerificationRepository } from './admin/drizzle-repository.js';
 import { CompanyVerificationService } from './admin/service.js';
 import { DrizzleAuthRepository } from './auth/drizzle-repository.js';
@@ -38,7 +40,6 @@ const documentProvider = cvStorageDirectory
   ? new FilesystemDocumentProvider(cvStorageDirectory)
   : new DeferredDocumentProvider();
 const cvService = new CvService(new DrizzleCvRepository(db), documentProvider);
-const discoveryService = new DiscoveryService(new DrizzleDiscoveryRepository(db));
 const interviewsService = new InterviewsService(new DrizzleInterviewsRepository(db), new DeferredGoogleMeetProvider());
 
 const bunnyLibraryId = process.env.BUNNY_STREAM_LIBRARY_ID;
@@ -48,11 +49,14 @@ const videoProvider =
   bunnyLibraryId && bunnyApiKey && bunnyCdnHostname
     ? new BunnyStreamVideoProvider({ libraryId: bunnyLibraryId, apiKey: bunnyApiKey, cdnHostname: bunnyCdnHostname })
     : new DeferredVideoProvider();
+const discoveryService = new DiscoveryService(new DrizzleDiscoveryRepository(db), videoProvider);
 const mediaService = new MediaService(new DrizzleMediaRepository(db), videoProvider);
 
 const messagingService = new MessagingService(new DrizzleMessagingRepository(db));
 const savedListsService = new SavedListsService(new DrizzleSavedListsRepository(db));
 const taxonomyService = new TaxonomyService(new DrizzleTaxonomyRepository(db));
+const webDistDirectory = fileURLToPath(new URL('../../web/dist/', import.meta.url));
+const serveWeb = existsSync(fileURLToPath(new URL('index.html', new URL('../../web/dist/', import.meta.url))));
 const app = createApp({
   authService,
   companyVerificationService,
@@ -65,6 +69,8 @@ const app = createApp({
   messagingService,
   savedListsService,
   taxonomyService,
+  trustProxyHops: process.env.NODE_ENV === 'production' ? 1 : undefined,
+  webDistDirectory: serveWeb ? webDistDirectory : undefined,
 });
 
 const server = app.listen(port, () => {

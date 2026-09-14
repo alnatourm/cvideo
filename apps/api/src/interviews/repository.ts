@@ -20,6 +20,7 @@ export interface InterviewRecord {
   id: string;
   companyId: string;
   candidateId: string;
+  candidateDisplayName?: string;
   requestedByUserId: string;
   opportunityTitle: string;
   startsAtUtc: Date;
