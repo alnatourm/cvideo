@@ -305,6 +305,7 @@ function AppShell({ locale, setLocale, children }: { locale: Locale; setLocale: 
   const companyItems = [
     ['/recruiter/search', text(locale, 'Search', 'البحث'), '⌕'],
     ['/recruiter/saved-lists', text(locale, 'Saved Lists', 'القوائم المحفوظة'), '☆'],
+    ['/recruiter/interviews', text(locale, 'Interviews', 'المقابلات'), '◷'],
     ['/recruiter/messages', text(locale, 'Messages', 'الرسائل'), '✉'],
     ['/recruiter/account', text(locale, 'Company Account', 'حساب الشركة'), '▣'],
   ];
@@ -733,6 +734,7 @@ function CandidateProfilePage({ locale, setLocale }: { locale: Locale; setLocale
 
 function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [candidates, setCandidates] = useState<CandidateSearchItem[]>([]);
   const [selected, setSelected] = useState<CandidateDetail | null>(null);
   const [countryCode, setCountryCode] = useState('');
@@ -758,7 +760,14 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
   }
 
   useEffect(() => {
-    void search();
+    const requestedCandidateId = searchParams.get('candidateId');
+    if (requestedCandidateId) {
+      void api.getCandidateDetail(requestedCandidateId)
+        .then((candidate) => { setCandidates([candidate]); setSelected(candidate); })
+        .catch((err) => setError(errorMessage(err)));
+    } else {
+      void search();
+    }
     void api.listSavedLists().then((result) => { setLists(result); setListId(result[0]?.id ?? ''); }).catch(() => undefined);
   }, []);
 
@@ -815,7 +824,7 @@ function RecruiterSearch({ locale, setLocale }: { locale: Locale; setLocale: (lo
         message: interviewForm.message || undefined,
         location: interviewForm.meetingType === 'in_person' ? interviewForm.location : undefined,
       });
-      setShowInterview(false); setNotice(text(locale, 'Interview request sent.', 'تم إرسال طلب المقابلة.'));
+      setShowInterview(false); setNotice(text(locale, 'Interview request sent. Track its status in Interviews.', 'تم إرسال طلب المقابلة. تابع حالته من صفحة المقابلات.'));
     } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
   }
 
@@ -879,7 +888,7 @@ function SavedListsPage({ locale, setLocale }: { locale: Locale; setLocale: (loc
 
   async function create(event: FormEvent) {
     event.preventDefault(); if (!newName.trim()) return;
-    try { const created = await api.createSavedList(newName.trim()); setNewName(''); setLists((current) => [created, ...current]); setSelected(created); }
+    try { const created = await api.createSavedList(newName.trim()); setNewName(''); setLists((current) => current.some((list) => list.id === created.id) ? current.map((list) => list.id === created.id ? created : list) : [created, ...current]); setSelected(created); }
     catch (err) { setError(errorMessage(err)); }
   }
 
@@ -897,7 +906,47 @@ function SavedListsPage({ locale, setLocale }: { locale: Locale; setLocale: (loc
     } catch (err) { setError(errorMessage(err)); }
   }
 
-  return <AppShell locale={locale} setLocale={setLocale}><PageHead eyebrow={text(locale, 'Saved Lists', 'القوائم المحفوظة')} title={text(locale, 'Organize people, not applications', 'نظّم الأشخاص، لا طلبات التوظيف')} description={text(locale, 'Saved Lists are private company collections, never ATS stages.', 'القوائم المحفوظة مجموعات خاصة بالشركة وليست مراحل توظيف.')}/>{error && <div className="notice error">{error}</div>}<div className="saved-layout"><section className="panel"><form className="inline-form" onSubmit={create}><input placeholder={text(locale, 'New list name', 'اسم قائمة جديدة')} value={newName} onChange={(e) => setNewName(e.target.value)} /><button className="button primary">＋</button></form><div className="list-stack">{lists.map((list) => <button className={`saved-list-card ${selected?.id === list.id ? 'active' : ''}`} key={list.id} onClick={() => void openList(list.id)}><div><strong>{list.name}</strong><small>{list.description || text(locale, 'Candidate collection', 'مجموعة مرشحين')}</small></div><b>{list.candidateCount}</b></button>)}</div></section><section className="panel"><span className="eyebrow">{text(locale, 'Selected list', 'القائمة المختارة')}</span><h2>{selected?.name || text(locale, 'Choose a list', 'اختر قائمة')}</h2>{selected?.candidates?.length ? <div className="saved-candidate-list">{selected.candidates.map((candidate) => <article key={candidate.id}><span className="mini-avatar">{candidate.displayName.slice(0, 1)}</span><div><strong>{candidate.displayName}</strong><small>{candidate.headline || text(locale, 'Professional candidate', 'مرشح مهني')} · {candidate.city}, {candidate.countryCode}</small></div><button type="button" className="ghost small" onClick={() => void removeCandidate(candidate.id)}>{text(locale, 'Remove', 'إزالة')}</button></article>)}</div> : <div className="empty-state">{text(locale, 'Save candidates from Search and they will appear here.', 'احفظ المرشحين من البحث وسيظهرون هنا.')}</div>}</section></div></AppShell>;
+  return <AppShell locale={locale} setLocale={setLocale}><PageHead eyebrow={text(locale, 'Saved Lists', 'القوائم المحفوظة')} title={text(locale, 'Organize people, not applications', 'نظّم الأشخاص، لا طلبات التوظيف')} description={text(locale, 'Saved Lists are private company collections, never ATS stages.', 'القوائم المحفوظة مجموعات خاصة بالشركة وليست مراحل توظيف.')}/>{error && <div className="notice error">{error}</div>}<div className="saved-layout"><section className="panel"><form className="inline-form" onSubmit={create}><input placeholder={text(locale, 'New list name', 'اسم قائمة جديدة')} value={newName} onChange={(e) => setNewName(e.target.value)} /><button className="button primary">＋</button></form><div className="list-stack">{lists.map((list) => <button className={`saved-list-card ${selected?.id === list.id ? 'active' : ''}`} key={list.id} onClick={() => void openList(list.id)}><div><strong>{list.name}</strong><small>{list.description || text(locale, 'Candidate collection', 'مجموعة مرشحين')}</small></div><b>{list.candidateCount}</b></button>)}</div></section><section className="panel"><span className="eyebrow">{text(locale, 'Selected list', 'القائمة المختارة')}</span><h2>{selected?.name || text(locale, 'Choose a list', 'اختر قائمة')}</h2>{selected?.candidates?.length ? <div className="saved-candidate-list">{selected.candidates.map((candidate) => <article key={candidate.id}><span className="mini-avatar">{candidate.displayName.slice(0, 1)}</span><div><strong>{candidate.displayName}</strong><small>{candidate.headline || text(locale, 'Professional candidate', 'مرشح مهني')} · {candidate.city}, {candidate.countryCode}</small></div><div className="actions compact-actions"><Link className="button secondary small" to={`/recruiter/search?candidateId=${encodeURIComponent(candidate.id)}`}>{text(locale, 'View profile', 'عرض الملف')}</Link><button type="button" className="ghost small" onClick={() => void removeCandidate(candidate.id)}>{text(locale, 'Remove', 'إزالة')}</button></div></article>)}</div> : <div className="empty-state">{text(locale, 'Save candidates from Search and they will appear here.', 'احفظ المرشحين من البحث وسيظهرون هنا.')}</div>}</section></div></AppShell>;
+}
+
+function CompanyInterviewsPage({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
+  const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+
+  async function load() {
+    setError('');
+    try { setInterviews(await api.listInterviews()); } catch (err) { setError(errorMessage(err)); }
+  }
+  useEffect(() => { void load(); }, []);
+
+  async function cancel(interview: Interview) {
+    if (!window.confirm(text(locale, 'Cancel this interview request?', 'إلغاء طلب المقابلة؟'))) return;
+    setBusy(interview.id); setError('');
+    try { await api.cancelInterview(interview.id); await load(); } catch (err) { setError(errorMessage(err)); } finally { setBusy(''); }
+  }
+
+  function statusLabel(status: Interview['status']) {
+    const labels: Record<Interview['status'], [string, string]> = {
+      pending: ['Sent — awaiting candidate', 'تم الإرسال — بانتظار المرشح'],
+      accepted: ['Accepted', 'مقبول'],
+      suggested_time: ['Candidate suggested another time', 'اقترح المرشح موعداً آخر'],
+      declined: ['Declined', 'مرفوض'],
+      cancelled: ['Cancelled', 'ملغي'],
+    };
+    return text(locale, ...labels[status]);
+  }
+
+  return <AppShell locale={locale} setLocale={setLocale}>
+    <PageHead eyebrow={text(locale, 'Company interviews', 'مقابلات الشركة')} title={text(locale, 'Interview requests and status', 'طلبات المقابلات وحالتها')} description={text(locale, 'Every request sent by your company appears here and updates when the candidate responds.', 'يظهر هنا كل طلب ترسله شركتك وتتحدث حالته عند رد المرشح.')} />
+    {error && <div className="notice error">{error}</div>}
+    <section className="panel interviews-panel">
+      {interviews.length === 0 ? <div className="empty-state tall">{text(locale, 'No interview requests have been sent yet.', 'لم يتم إرسال طلبات مقابلة بعد.')}</div> : interviews.map((interview) => <article className="interview-row" key={interview.id}>
+        <div><span className={`status ${interview.status}`}>{statusLabel(interview.status)}</span><h3>{interview.candidateDisplayName || text(locale, 'Candidate', 'المرشح')}</h3><strong>{interview.opportunityTitle}</strong><p>{new Date(interview.startsAtUtc).toLocaleString(locale === 'ar' ? 'ar-JO' : 'en-GB')} · {interview.durationMinutes} min</p>{interview.message && <small>{interview.message}</small>}{interview.suggestedStartsAtUtc && <p>{text(locale, 'Suggested:', 'الموعد المقترح:')} {new Date(interview.suggestedStartsAtUtc).toLocaleString(locale === 'ar' ? 'ar-JO' : 'en-GB')}</p>}</div>
+        <div className="actions compact-actions"><Link className="button secondary small" to={`/recruiter/search?candidateId=${encodeURIComponent(interview.candidateId)}`}>{text(locale, 'View candidate', 'عرض المرشح')}</Link>{['pending', 'accepted', 'suggested_time'].includes(interview.status) && <button type="button" className="ghost small" disabled={busy === interview.id} onClick={() => void cancel(interview)}>{text(locale, 'Cancel request', 'إلغاء الطلب')}</button>}</div>
+      </article>)}
+    </section>
+  </AppShell>;
 }
 
 function MessagesPage({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
@@ -1054,6 +1103,7 @@ export function App() {
       <Route path="/candidate/messages" element={<RequireRole roles={['candidate']}><MessagesPage locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/recruiter/search" element={<RequireRole roles={companyRoles}><RecruiterSearch locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/recruiter/saved-lists" element={<RequireRole roles={companyRoles}><SavedListsPage locale={locale} setLocale={setLocale} /></RequireRole>} />
+      <Route path="/recruiter/interviews" element={<RequireRole roles={companyRoles}><CompanyInterviewsPage locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/recruiter/messages" element={<RequireRole roles={companyRoles}><MessagesPage locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/recruiter/account" element={<RequireRole roles={companyRoles}><CompanyAccount locale={locale} setLocale={setLocale} /></RequireRole>} />
       <Route path="/admin" element={<RequireRole roles={['super_admin']}><AdminPage locale={locale} setLocale={setLocale} /></RequireRole>} />

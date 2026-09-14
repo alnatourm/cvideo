@@ -142,6 +142,7 @@ export interface Interview {
   id: string;
   companyId: string;
   candidateId: string;
+  candidateDisplayName?: string;
   requestedByUserId: string;
   opportunityTitle: string;
   startsAtUtc: string;
@@ -342,6 +343,7 @@ export const api = {
   acceptInterview: (id: string) => apiRequest<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/accept`, { method: 'POST' }),
   declineInterview: (id: string, message?: string) => apiRequest<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/decline`, { method: 'POST', body: jsonBody({ message }) }),
   suggestInterviewTime: (id: string, startsAtUtc: string, timezone: string, message?: string) => apiRequest<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/suggest-time`, { method: 'POST', body: jsonBody({ startsAtUtc, timezone, message }) }),
+  cancelInterview: (id: string) => apiRequest<Interview>(`/api/v1/interviews/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
 
   categories: () => apiRequest<TaxonomyItem[]>('/api/v1/taxonomy/categories'),
   subcategories: (categoryId: string) => apiRequest<TaxonomyItem[]>(`/api/v1/taxonomy/categories/${encodeURIComponent(categoryId)}/subcategories`),

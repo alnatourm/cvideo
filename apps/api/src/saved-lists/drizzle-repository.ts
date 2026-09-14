@@ -81,8 +81,20 @@ export class DrizzleSavedListsRepository implements SavedListsRepository {
         name: input.name,
         description: input.description ?? null,
       })
+      .onConflictDoNothing()
       .returning({ id: savedLists.id });
-    if (!row) throw new Error('Failed to create saved list');
+    if (!row) {
+      const [existing] = await this.db
+        .select({ id: savedLists.id })
+        .from(savedLists)
+        .where(and(eq(savedLists.companyId, companyId), sql`lower(btrim(${savedLists.name})) = lower(btrim(${input.name}))`))
+        .limit(1);
+      if (existing) {
+        const detail = await this.get(companyId, existing.id);
+        if (detail) return detail;
+      }
+      throw new Error('Failed to create saved list');
+    }
     const created = await this.get(companyId, row.id);
     if (!created) throw new Error('Failed to read created saved list');
     return created;
