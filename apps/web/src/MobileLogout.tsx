@@ -8,12 +8,10 @@ export function MobileLogout() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
-  const insideAuthenticatedApp =
-    location.pathname.startsWith('/candidate/') ||
-    location.pathname.startsWith('/recruiter/') ||
-    location.pathname.startsWith('/admin');
+  const isCandidateProfile = principal?.effectiveRole === 'candidate' && location.pathname === '/candidate/profile';
+  const isCompanyAccount = principal?.effectiveRole !== 'candidate' && principal?.effectiveRole !== 'super_admin' && location.pathname === '/recruiter/account';
 
-  if (!principal || !insideAuthenticatedApp) return null;
+  if (!principal || (!isCandidateProfile && !isCompanyAccount)) return null;
 
   async function signOut() {
     if (busy) return;
@@ -29,44 +27,37 @@ export function MobileLogout() {
   const arabic = document.documentElement.lang === 'ar';
 
   return (
-    <>
+    <div className="mobile-account-actions">
       <style>{`
-        .mobile-logout-button {
-          display: none;
-        }
+        .mobile-account-actions { display: none; }
         @media (max-width: 900px) {
-          .mobile-logout-button {
-            display: inline-flex;
-            position: fixed;
-            right: 18px;
-            bottom: 92px;
-            z-index: 1200;
-            align-items: center;
-            justify-content: center;
-            min-height: 44px;
-            padding: 0 16px;
-            border: 1px solid rgba(255,255,255,.2);
-            border-radius: 999px;
-            background: #111a36;
-            color: #fff;
+          .mobile-account-actions {
+            display: block;
+            margin: -118px 18px 118px;
+            position: relative;
+            z-index: 2;
+          }
+          .mobile-account-logout {
+            width: 100%;
+            min-height: 52px;
+            border: 1px solid #fecaca;
+            border-radius: 14px;
+            background: #fff;
+            color: #b91c1c;
             font: inherit;
-            font-weight: 700;
-            box-shadow: 0 8px 24px rgba(15,23,42,.22);
+            font-weight: 800;
           }
-          .mobile-logout-button:disabled {
-            opacity: .65;
-          }
+          .mobile-account-logout:disabled { opacity: .65; }
         }
       `}</style>
       <button
-        className="mobile-logout-button"
+        className="mobile-account-logout"
         type="button"
         onClick={() => void signOut()}
         disabled={busy}
-        aria-label={arabic ? 'تسجيل الخروج' : 'Logout'}
       >
-        {busy ? (arabic ? 'جاري الخروج…' : 'Signing out…') : (arabic ? 'تسجيل الخروج' : 'Logout')}
+        {busy ? (arabic ? 'جاري تسجيل الخروج…' : 'Signing out…') : (arabic ? 'تسجيل الخروج' : 'Logout')}
       </button>
-    </>
+    </div>
   );
 }
