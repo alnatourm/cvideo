@@ -10,6 +10,8 @@ export interface CandidateProfileUpdate {
   skillIds: string[];
   languageIds: string[];
   yearsExperience: number;
+  certificateCount: number;
+  highestEducationLevel: 'none' | 'high_school' | 'vocational' | 'diploma' | 'bachelor' | 'master' | 'doctorate' | 'professor';
   professionalSummary?: string | null;
 }
 
@@ -71,6 +73,8 @@ export interface CandidateOwnProfile {
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   yearsExperience: number;
+  certificateCount: number;
+  highestEducationLevel: 'none' | 'high_school' | 'vocational' | 'diploma' | 'bachelor' | 'master' | 'doctorate' | 'professor';
   professionalSummary: string | null;
   cvOriginalFilename: string | null;
   extraSubfieldIds: string[];

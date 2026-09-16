@@ -1,4 +1,5 @@
-import { index, pgTable, primaryKey, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { index, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { candidateProfiles } from '../db/schema.js';
 import { companies, users } from '../db/security-schema.js';
 
@@ -17,7 +18,10 @@ export const savedLists = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('saved_lists_company_idx').on(table.companyId)],
+  (table) => [
+    index('saved_lists_company_idx').on(table.companyId),
+    uniqueIndex('saved_lists_company_normalized_name_unique').on(table.companyId, sql`lower(btrim(${table.name}))`),
+  ],
 );
 
 export const savedCandidates = pgTable(

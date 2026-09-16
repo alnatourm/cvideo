@@ -29,6 +29,7 @@ export const categories = pgTable(
     code: varchar('code', { length: 80 }).notNull(),
     nameEn: varchar('name_en', { length: 160 }).notNull(),
     nameAr: varchar('name_ar', { length: 160 }).notNull(),
+    displayOrder: integer('display_order').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -46,6 +47,7 @@ export const subcategories = pgTable(
     code: varchar('code', { length: 80 }).notNull(),
     nameEn: varchar('name_en', { length: 160 }).notNull(),
     nameAr: varchar('name_ar', { length: 160 }).notNull(),
+    displayOrder: integer('display_order').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -61,8 +63,15 @@ export const jobTitles = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     code: varchar('code', { length: 100 }).notNull(),
+    categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
+    primarySubcategoryId: uuid('primary_subcategory_id').references(() => subcategories.id, { onDelete: 'set null' }),
     nameEn: varchar('name_en', { length: 180 }).notNull(),
     nameAr: varchar('name_ar', { length: 180 }).notNull(),
+    displayOrder: integer('display_order').notNull().default(0),
+    onetSocCode: varchar('onet_soc_code', { length: 16 }),
+    source: varchar('source', { length: 80 }),
+    arabicReviewRequired: boolean('arabic_review_required').notNull().default(false),
+    sourceUrl: text('source_url'),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -75,13 +84,76 @@ export const skills = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     code: varchar('code', { length: 100 }).notNull(),
+    categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
     nameEn: varchar('name_en', { length: 180 }).notNull(),
     nameAr: varchar('name_ar', { length: 180 }).notNull(),
+    skillTypeEn: varchar('skill_type_en', { length: 80 }),
+    skillTypeAr: varchar('skill_type_ar', { length: 80 }),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('skills_code_unique').on(table.code)],
+);
+
+export const subcategoryRelations = pgTable(
+  'subcategory_relations',
+  {
+    subcategoryId: uuid('subcategory_id').notNull().references(() => subcategories.id, { onDelete: 'cascade' }),
+    relatedSubcategoryId: uuid('related_subcategory_id').notNull().references(() => subcategories.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subcategoryId, table.relatedSubcategoryId] }),
+    uniqueIndex('subcategory_relations_position_unique').on(table.subcategoryId, table.position),
+  ],
+);
+
+export const jobTitleSubcategories = pgTable(
+  'job_title_subcategories',
+  {
+    jobTitleId: uuid('job_title_id').notNull().references(() => jobTitles.id, { onDelete: 'cascade' }),
+    subcategoryId: uuid('subcategory_id').notNull().references(() => subcategories.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.jobTitleId, table.subcategoryId] }),
+    uniqueIndex('job_title_subcategories_position_unique').on(table.jobTitleId, table.position),
+  ],
+);
+
+export const jobTitleAliases = pgTable(
+  'job_title_aliases',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    code: varchar('code', { length: 100 }).notNull(),
+    jobTitleId: uuid('job_title_id').notNull().references(() => jobTitles.id, { onDelete: 'cascade' }),
+    aliasEn: varchar('alias_en', { length: 180 }).notNull(),
+    aliasAr: varchar('alias_ar', { length: 180 }).notNull(),
+    onetSocCode: varchar('onet_soc_code', { length: 16 }),
+    arabicReviewRequired: boolean('arabic_review_required').notNull().default(false),
+    isActive: boolean('is_active').notNull().default(true),
+  },
+  (table) => [
+    uniqueIndex('job_title_aliases_code_unique').on(table.code),
+    index('job_title_aliases_job_title_idx').on(table.jobTitleId),
+  ],
+);
+
+export const jobTitleSkills = pgTable(
+  'job_title_skills',
+  {
+    jobTitleId: uuid('job_title_id').notNull().references(() => jobTitles.id, { onDelete: 'cascade' }),
+    skillId: uuid('skill_id').notNull().references(() => skills.id, { onDelete: 'cascade' }),
+    rank: integer('rank').notNull(),
+    importanceEn: varchar('importance_en', { length: 32 }).notNull(),
+    importanceAr: varchar('importance_ar', { length: 32 }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.jobTitleId, table.skillId] }),
+    uniqueIndex('job_title_skills_rank_unique').on(table.jobTitleId, table.rank),
+    index('job_title_skills_skill_idx').on(table.skillId),
+  ],
 );
 
 export const languages = pgTable(
@@ -113,6 +185,8 @@ export const candidateProfiles = pgTable(
       onDelete: 'set null',
     }),
     yearsExperience: integer('years_experience').notNull().default(0),
+    certificateCount: integer('certificate_count').notNull().default(0),
+    highestEducationLevel: varchar('highest_education_level', { length: 32 }).notNull().default('none'),
     professionalSummary: text('professional_summary'),
     cvStorageKey: text('cv_storage_key'),
     cvOriginalFilename: varchar('cv_original_filename', { length: 255 }),

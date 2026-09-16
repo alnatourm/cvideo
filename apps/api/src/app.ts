@@ -1,6 +1,7 @@
 import cookieParser from 'cookie-parser';
 import express, { type ErrorRequestHandler } from 'express';
 import helmet from 'helmet';
+import { resolve } from 'node:path';
 import { ZodError } from 'zod';
 import { AdminError } from './admin/errors.js';
 import { createAdminRouter, createCompanyVerificationRouter } from './admin/routes.js';
@@ -48,13 +49,22 @@ export interface AppOptions {
   savedListsService?: SavedListsService;
   taxonomyService?: TaxonomyService;
   secureCookies?: boolean;
+  trustProxyHops?: number;
+  webDistDirectory?: string;
 }
 
 export function createApp(options: AppOptions = {}) {
   const app = express();
 
   app.disable('x-powered-by');
-  app.use(helmet());
+  if (options.trustProxyHops !== undefined) app.set('trust proxy', options.trustProxyHops);
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        frameSrc: ["'self'", 'https://iframe.mediadelivery.net'],
+      },
+    },
+  }));
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 
@@ -96,6 +106,21 @@ export function createApp(options: AppOptions = {}) {
     app.use('/api/v1/interviews', createInterviewsRouter(options.authService, options.interviewsService));
   }
 
+  if (options.webDistDirectory) {
+    const webIndex = resolve(options.webDistDirectory, 'index.html');
+    app.use(express.static(options.webDistDirectory, { index: false }));
+    app.get('/{*path}', (req, res, next) => {
+      if (req.path === '/api' || req.path.startsWith('/api/')) {
+        next();
+        return;
+      }
+
+      res.sendFile(webIndex, (error) => {
+        if (error) next(error);
+      });
+    });
+  }
+
   app.use((_req, res) => {
     res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found', details: {} } });
   });
@@ -128,7 +153,16 @@ export function createApp(options: AppOptions = {}) {
       return;
     }
 
-    console.error(JSON.stringify({ level: 'error', service: 'cvideo-api', message: 'unhandled_error' }));
+    const errorDetails = typeof error === 'object' && error !== null ? error as Record<string, unknown> : {};
+    console.error(JSON.stringify({
+      level: 'error',
+      service: 'cvideo-api',
+      message: 'unhandled_error',
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorCode: typeof errorDetails.code === 'string' ? errorDetails.code : undefined,
+      constraint: typeof errorDetails.constraint === 'string' ? errorDetails.constraint : undefined,
+    }));
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: {} } });
   };
 

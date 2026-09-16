@@ -13,7 +13,6 @@ import {
   type TaxonomyItem,
 } from './api';
 import { MessagesPanel } from './messages-panel';
-import { ProfileEvidenceEditor } from './profile-evidence-editor';
 import {
   BottomTabs,
   Card,
@@ -33,6 +32,16 @@ import {
 import { prepareVideoAsset } from './video-upload';
 
 type Tab = 'home' | 'messages' | 'profile';
+const educationLevels: Array<{ value: CandidateProfile['highestEducationLevel']; en: string; ar: string }> = [
+  { value: 'none', en: 'No formal education', ar: 'بدون مؤهل' },
+  { value: 'high_school', en: 'High school', ar: 'الثانوية العامة' },
+  { value: 'vocational', en: 'Vocational or technical', ar: 'مهني أو تقني' },
+  { value: 'diploma', en: 'Diploma', ar: 'دبلوم' },
+  { value: 'bachelor', en: "Bachelor's", ar: 'بكالوريوس' },
+  { value: 'master', en: "Master's", ar: 'ماجستير' },
+  { value: 'doctorate', en: 'Doctorate (PhD)', ar: 'دكتوراه' },
+  { value: 'professor', en: 'Professor or academic rank', ar: 'أستاذ جامعي' },
+];
 
 function errorMessage(locale: Locale, err: unknown) {
   return err instanceof ApiError || err instanceof Error ? err.message : tx(locale, 'Something went wrong', 'حدث خطأ غير متوقع');
@@ -91,6 +100,7 @@ export function CandidateApp({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState('');
+  const [educationOpen, setEducationOpen] = useState(false);
   const rtl = locale === 'ar';
 
   const tabs = useMemo(() => [
@@ -249,6 +259,8 @@ export function CandidateApp({
         skillIds: profile.skillIds,
         languageIds: profile.languageIds,
         yearsExperience: profile.yearsExperience,
+        certificateCount: profile.certificateCount,
+        highestEducationLevel: profile.highestEducationLevel,
         professionalSummary: profile.professionalSummary,
       });
       setProfile(updated);
@@ -256,10 +268,6 @@ export function CandidateApp({
       setCompleteness(value.percent);
       setNotice(tx(locale, 'Profile saved.', 'تم حفظ الملف.'));
     } catch (err) { setError(errorMessage(locale, err)); } finally { setBusy(''); }
-  }
-
-  function evidenceChanged() {
-    void api.completeness().then((value) => setCompleteness(value.percent)).catch(() => undefined);
   }
 
   async function chooseCv() {
@@ -357,7 +365,11 @@ export function CandidateApp({
                 <Field locale={locale} label={tx(locale, 'Name', 'الاسم')} value={profile.displayName} onChangeText={(displayName) => setProfile({ ...profile, displayName })} />
                 <Field locale={locale} label={tx(locale, 'Professional headline', 'المسمى المهني')} value={profile.headline ?? ''} onChangeText={(headline) => setProfile({ ...profile, headline: headline || null })} />
                 <View style={styles.twoCol}><View style={styles.flex}><Field locale={locale} label={tx(locale, 'Country', 'الدولة')} value={profile.countryCode} maxLength={2} autoCapitalize="characters" onChangeText={(countryCode) => setProfile({ ...profile, countryCode: countryCode.toUpperCase() })} /></View><View style={styles.flex}><Field locale={locale} label={tx(locale, 'City', 'المدينة')} value={profile.city} onChangeText={(city) => setProfile({ ...profile, city })} /></View></View>
-                <Field locale={locale} label={tx(locale, 'Years of experience', 'سنوات الخبرة')} value={String(profile.yearsExperience)} keyboardType="number-pad" onChangeText={(value) => setProfile({ ...profile, yearsExperience: Math.max(0, Math.min(80, Number(value) || 0)) })} />
+                <Field locale={locale} label={tx(locale, 'Years of experience', 'سنوات الخبرة')} value={String(profile.yearsExperience)} keyboardType="number-pad" onChangeText={(value) => setProfile({ ...profile, yearsExperience: Math.max(0, Math.min(50, Number(value) || 0)) })} />
+                <Field locale={locale} label={tx(locale, 'Certificates', 'عدد الشهادات')} value={String(profile.certificateCount)} keyboardType="number-pad" onChangeText={(value) => setProfile({ ...profile, certificateCount: Math.max(0, Math.min(50, Number(value) || 0)) })} />
+                <Text style={[styles.sectionLabel, rtl && styles.rtl]}>{tx(locale, 'Highest education', 'أعلى مؤهل تعليمي')}</Text>
+                <Pressable style={styles.educationSelect} onPress={() => setEducationOpen((open) => !open)}><Text style={[styles.educationSelectText, rtl && styles.rtl]}>{tx(locale, educationLevels.find((item) => item.value === profile.highestEducationLevel)?.en ?? 'No formal education', educationLevels.find((item) => item.value === profile.highestEducationLevel)?.ar ?? 'بدون مؤهل')}  ▾</Text></Pressable>
+                {educationOpen ? <View style={styles.educationOptions}>{educationLevels.map((item) => <Pressable key={item.value} style={[styles.educationOption, item.value === profile.highestEducationLevel && styles.educationOptionActive]} onPress={() => { setProfile({ ...profile, highestEducationLevel: item.value }); setEducationOpen(false); }}><Text style={[styles.educationOptionText, item.value === profile.highestEducationLevel && styles.educationOptionTextActive, rtl && styles.rtl]}>{tx(locale, item.en, item.ar)}</Text></Pressable>)}</View> : null}
                 <Field locale={locale} label={tx(locale, 'Professional summary', 'الملخص المهني')} value={profile.professionalSummary ?? ''} multiline onChangeText={(professionalSummary) => setProfile({ ...profile, professionalSummary: professionalSummary || null })} />
 
                 <Text style={[styles.sectionLabel, rtl && styles.rtl]}>{tx(locale, 'Main field', 'المجال الرئيسي')}</Text>
@@ -374,7 +386,6 @@ export function CandidateApp({
               </Card>
             )}
             {profile ? <Card><Text style={[styles.eyebrow, rtl && styles.rtl]}>{tx(locale, 'OPTIONAL CV', 'السيرة الذاتية الاختيارية')}</Text><Text style={[styles.cardTitle, rtl && styles.rtl]}>{profile.cvOriginalFilename ?? tx(locale, 'No CV uploaded', 'لم يتم رفع سيرة ذاتية')}</Text><Text style={[styles.body, rtl && styles.rtl]}>{tx(locale, 'PDF only, up to 10 MB. It stays private and is served only through authorized CVIDEO access.', 'ملف PDF فقط، حتى 10 ميجابايت. يبقى خاصًا ولا يُعرض إلا عبر وصول CVIDEO المصرح.')}</Text><PrimaryButton label={busy === 'cv' ? tx(locale, 'Working…', 'جاري التنفيذ…') : tx(locale, profile.cvOriginalFilename ? 'Replace PDF' : 'Choose PDF', profile.cvOriginalFilename ? 'استبدال PDF' : 'اختر PDF')} onPress={() => void chooseCv()} disabled={busy === 'cv'} />{profile.cvOriginalFilename ? <Pressable style={styles.deleteVideo} onPress={confirmDeleteCv} disabled={busy === 'cv'}><Text style={styles.deleteVideoText}>{tx(locale, 'Delete CV', 'حذف السيرة الذاتية')}</Text></Pressable> : null}</Card> : null}
-            {profile ? <ProfileEvidenceEditor locale={locale} initialExperience={profile.experience} initialEducation={profile.education} initialCertificates={profile.certificates} onChanged={evidenceChanged} onError={setError} onNotice={setNotice} /> : null}
           </>
         ) : null}
       </Screen>
@@ -393,6 +404,13 @@ const styles = StyleSheet.create({
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   eyebrow: { color: colors.blue, fontWeight: '900', fontSize: 10, letterSpacing: 1.1 },
   cardTitle: { color: colors.ink, fontWeight: '900', fontSize: 20, marginTop: 3 },
+  educationSelect: { minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: colors.white },
+  educationSelectText: { color: colors.ink, fontWeight: '700' },
+  educationOptions: { borderWidth: 1, borderColor: colors.line, borderRadius: 12, overflow: 'hidden', marginTop: -6, marginBottom: 8 },
+  educationOption: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line },
+  educationOptionActive: { backgroundColor: colors.blue },
+  educationOptionText: { color: colors.ink, fontWeight: '600' },
+  educationOptionTextActive: { color: colors.white },
   body: { color: colors.muted, lineHeight: 20, fontSize: 13 },
   videoEmpty: { minHeight: 280, backgroundColor: colors.navy, borderRadius: 17, alignItems: 'center', justifyContent: 'center', padding: 26, gap: 4 },
   videoNumber: { color: colors.cyan, fontSize: 64, fontWeight: '900' },

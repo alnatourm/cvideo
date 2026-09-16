@@ -60,7 +60,18 @@ export const candidateProfileInputSchema = z.object({
   preferredRoleIds: z.array(uuidSchema).max(5).default([]),
   skillIds: z.array(uuidSchema).max(50).default([]),
   languageIds: z.array(uuidSchema).max(20).default([]),
-  yearsExperience: z.number().int().min(0).max(80),
+  yearsExperience: z.number().int().min(0).max(50),
+  certificateCount: z.number().int().min(0).max(50),
+  highestEducationLevel: z.enum([
+    'none',
+    'high_school',
+    'vocational',
+    'diploma',
+    'bachelor',
+    'master',
+    'doctorate',
+    'professor',
+  ]),
   professionalSummary: z.string().trim().max(2000).optional().nullable(),
 });
 

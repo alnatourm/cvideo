@@ -20,6 +20,7 @@ export interface VideoProviderSnapshot {
 
 export interface VideoProvider {
   readonly name: string;
+  getEmbedUrl?(assetId: string): string | null;
   createAsset(input: VideoProviderCreateInput): Promise<VideoProviderAsset>;
   uploadAsset(assetId: string, body: unknown, contentLength?: number): Promise<void>;
   getAsset(assetId: string): Promise<VideoProviderSnapshot>;
@@ -28,6 +29,10 @@ export interface VideoProvider {
 
 export class DeferredVideoProvider implements VideoProvider {
   readonly name = 'unconfigured';
+
+  getEmbedUrl(_assetId: string): string | null {
+    return null;
+  }
 
   private unavailable(): never {
     throw new MediaError('MEDIA_PROVIDER_NOT_CONFIGURED', 503, 'Video provider is not configured');
@@ -55,6 +60,7 @@ interface BunnyVideoResponse {
   length?: number;
   status?: number;
   height?: number;
+  width?: number;
   thumbnailFileName?: string | null;
   transcodingMessages?: Array<{ message?: string | null }> | null;
 }
@@ -78,6 +84,10 @@ export class BunnyStreamVideoProvider implements VideoProvider {
   ) {
     this.apiBase = `https://video.bunnycdn.com/library/${encodeURIComponent(config.libraryId)}/videos`;
     this.cdnBase = `https://${config.cdnHostname.replace(/^https?:\/\//, '').replace(/\/$/, '')}`;
+  }
+
+  getEmbedUrl(assetId: string): string {
+    return `https://iframe.mediadelivery.net/embed/${encodeURIComponent(this.config.libraryId)}/${encodeURIComponent(assetId)}`;
   }
 
   private async request(url: string, init: RequestInit & { duplex?: 'half' }) {
@@ -132,7 +142,9 @@ export class BunnyStreamVideoProvider implements VideoProvider {
     });
     const data = (await response.json()) as BunnyVideoResponse;
     const status = data.status ?? 0;
-    const state: VideoProviderSnapshot['state'] = status === 3 ? 'ready' : status === 5 || status === 8 ? 'failed' : 'processing';
+    const state: VideoProviderSnapshot['state'] = status === 3 || status === 4
+      ? 'ready'
+      : status === 5 || status === 8 ? 'failed' : 'processing';
     const thumbnailUrl = data.thumbnailFileName
       ? `${this.cdnBase}/${encodeURIComponent(assetId)}/${encodeURIComponent(data.thumbnailFileName)}`
       : null;
@@ -145,7 +157,9 @@ export class BunnyStreamVideoProvider implements VideoProvider {
       assetId,
       state,
       durationSeconds: Number.isFinite(data.length) ? Number(data.length) : null,
-      height: Number.isFinite(data.height) ? Number(data.height) : null,
+      height: Number.isFinite(data.height) && Number.isFinite(data.width)
+        ? Math.min(Number(data.height), Number(data.width))
+        : Number.isFinite(data.height) ? Number(data.height) : null,
       playbackUrl: state === 'ready' ? `${this.cdnBase}/${encodeURIComponent(assetId)}/playlist.m3u8` : null,
       thumbnailUrl,
       failureReason,

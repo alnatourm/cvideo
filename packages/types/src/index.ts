@@ -2,6 +2,7 @@ export type Locale = 'en' | 'ar';
 
 export type CandidateAvailability = 'open' | 'paused' | 'hidden';
 export type CandidateVideoStatus = 'pending' | 'uploading' | 'processing' | 'ready' | 'rejected' | 'failed';
+export type HighestEducationLevel = 'none' | 'high_school' | 'vocational' | 'diploma' | 'bachelor' | 'master' | 'doctorate' | 'professor';
 export type MeetingType = 'google_meet' | 'video_call' | 'in_person';
 export type InterviewStatus = 'pending' | 'accepted' | 'suggested_time' | 'declined' | 'cancelled';
 
@@ -29,6 +30,8 @@ export interface CandidatePreview {
   country: string;
   city: string;
   yearsExperience: number;
+  certificateCount: number;
+  highestEducationLevel: HighestEducationLevel;
   skills: string[];
   preferredRoles: string[];
   videoStatus: CandidateVideoStatus;

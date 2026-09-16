@@ -115,6 +115,8 @@ class JourneyRepository implements DiscoveryRepository, SavedListsRepository, Me
       countryCode: 'JO',
       city: 'Amman',
       yearsExperience: 8,
+      certificateCount: 4,
+      highestEducationLevel: 'bachelor' as const,
       primaryCategoryId: null,
       primarySubcategoryId: null,
       introductionVideoId: randomUUID(),
