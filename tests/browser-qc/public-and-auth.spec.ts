@@ -36,11 +36,6 @@ async function apiPost<T>(page: Page, path: string, data: unknown) {
   return jsonData<T>(await page.request.post(path, { data, headers: csrf ? { 'x-csrf-token': csrf } : undefined }), 'POST');
 }
 
-async function apiPut<T>(page: Page, path: string, data: unknown) {
-  const csrf = await page.evaluate(() => localStorage.getItem('cvideo_csrf'));
-  return jsonData<T>(await page.request.put(path, { data, headers: csrf ? { 'x-csrf-token': csrf } : undefined }), 'PUT');
-}
-
 const logoutName = /Logout|تسجيل الخروج|خروج/i;
 
 test('public shell and login render without browser errors', async ({ page }) => {
@@ -152,7 +147,7 @@ test('candidate -> recruiter -> candidate critical transaction', async ({ page, 
 
   const candidateInterviews = await apiGet<Array<{ id: string; status: string }>>(page, '/api/v1/interviews');
   expect(candidateInterviews.find((item) => item.id === interview.id)?.status).toBe('pending');
-  const accepted = await apiPut<{ id: string; status: string }>(page, `/api/v1/interviews/${interview.id}/candidate-response`, { type: 'accept' });
+  const accepted = await apiPost<{ id: string; status: string }>(page, `/api/v1/interviews/${interview.id}/accept`, {});
   expect(accepted.status).toBe('accepted');
 
   const recruiterInterviews = await apiGet<Array<{ id: string; status: string }>>(recruiterPage, '/api/v1/interviews');
