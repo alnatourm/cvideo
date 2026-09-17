@@ -10,7 +10,11 @@
     "build": "pnpm -r --if-present run build",
     "typecheck": "pnpm -r --if-present run typecheck",
     "test": "pnpm -r --if-present run test",
-    "smoke:release": "node scripts/release-smoke.mjs"
+    "smoke:release": "node scripts/release-smoke.mjs",
+    "qc:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
   },
   "engines": {
     "node": ">=22.13"
