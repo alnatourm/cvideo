@@ -12,11 +12,16 @@ describe('CVIDEO API foundation', () => {
     expect(response.body).toEqual({ status: 'ok', service: 'cvideo-api', version: 'v1' });
   });
 
+  it('exposes the deployed revision when supplied for Factory QC proof', async () => {
+    const revision = '72b24b8cd47341815f993bbeb6604826b19da076';
+    const response = await request(createApp({ deployedRevision: revision })).get('/api/v1/health');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok', service: 'cvideo-api', version: 'v1', revision });
+  });
+
   it('allows the Bunny Stream player in the content security policy', async () => {
     const response = await request(createApp()).get('/api/v1/health');
-    expect(response.headers['content-security-policy']).toContain(
-      "frame-src 'self' https://iframe.mediadelivery.net",
-    );
+    expect(response.headers['content-security-policy']).toContain("frame-src 'self' https://iframe.mediadelivery.net");
   });
 
   it('returns the canonical error envelope for unknown routes', async () => {
@@ -33,12 +38,10 @@ describe('CVIDEO API foundation', () => {
   it('serves the web shell for client-side routes without masking API 404s', async () => {
     const webDirectory = await mkdtemp(join(tmpdir(), 'cvideo-web-'));
     await writeFile(join(webDirectory, 'index.html'), '<!doctype html><title>CVIDEO shell</title>');
-
     try {
       const webResponse = await request(createApp({ webDistDirectory: webDirectory })).get('/en/company/search');
       expect(webResponse.status).toBe(200);
       expect(webResponse.text).toContain('CVIDEO shell');
-
       const apiResponse = await request(createApp({ webDistDirectory: webDirectory })).get('/api/v1/unknown');
       expect(apiResponse.status).toBe(404);
       expect(apiResponse.body.error.code).toBe('NOT_FOUND');
