@@ -27,6 +27,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Detect authenticated QC configuration
+        id: auth
+        shell: bash
+        run: |
+          if [[ -n "$CVIDEO_QC_CANDIDATE_EMAIL" && -n "$CVIDEO_QC_CANDIDATE_PASSWORD" && -n "$CVIDEO_QC_RECRUITER_EMAIL" && -n "$CVIDEO_QC_RECRUITER_PASSWORD" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Authenticated QC secrets are not configured; public browser QC will still run."
+          fi
+      - name: Provision dedicated QC identities
+        if: steps.auth.outputs.configured == 'true'
+        run: node scripts/qc-provision.mjs
       - name: Install browser QC runner
         working-directory: tests/browser-qc
         run: npm install --no-audit --no-fund
