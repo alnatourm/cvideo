@@ -58,10 +58,15 @@ jobs:
         working-directory: tests/browser-qc
         run: npm test
       - name: Evaluate Factory release gate
+        id: gate
         if: always()
+        continue-on-error: true
         env:
           CVIDEO_QC_RESULTS: tests/browser-qc/test-results/results.json
         run: node scripts/qc-release-gate.mjs
+      - name: Generate Defect Agent and Fix Agent handoff
+        if: always()
+        run: node scripts/qc-defect-triage.mjs
       - name: Upload QC evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -73,3 +78,8 @@ jobs:
             qc-evidence/
           if-no-files-found: ignore
           retention-days: 14
+      - name: Enforce release gate
+        if: always()
+        shell: bash
+        run: |
+          node -e "const fs=require('fs'); const g=JSON.parse(fs.readFileSync('qc-evidence/release-gate.json','utf8')); if(g.decision!=='READY_FOR_OWNER'){ console.error('Factory release blocked:', g.blockers); process.exit(1) } console.log('Factory gate: READY_FOR_OWNER')"
