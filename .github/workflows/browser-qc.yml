@@ -1,0 +1,119 @@
+name: Browser QC Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: CVIDEO deployment URL to test
+        required: false
+        default: https://cvideoapi-production.up.railway.app
+      require_authenticated_qc:
+        description: Block unless Candidate + Recruiter QC executes
+        required: false
+        type: boolean
+        default: false
+      require_deployed_revision:
+        description: Block unless target deployment proves the expected Git SHA
+        required: false
+        type: boolean
+        default: false
+      expected_sha:
+        description: Exact 40-character Git SHA expected on the deployed target
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  browser-qc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CVIDEO_QC_BASE_URL: ${{ inputs.base_url || 'https://cvideoapi-production.up.railway.app' }}
+      CVIDEO_QC_REQUIRE_AUTH: ${{ inputs.require_authenticated_qc || 'false' }}
+      CVIDEO_QC_REQUIRE_REVISION: ${{ inputs.require_deployed_revision || 'false' }}
+      CVIDEO_QC_EXPECTED_SHA: ${{ inputs.expected_sha || '' }}
+      CVIDEO_QC_CANDIDATE_EMAIL: ${{ secrets.CVIDEO_QC_CANDIDATE_EMAIL }}
+      CVIDEO_QC_CANDIDATE_PASSWORD: ${{ secrets.CVIDEO_QC_CANDIDATE_PASSWORD }}
+      CVIDEO_QC_RECRUITER_EMAIL: ${{ secrets.CVIDEO_QC_RECRUITER_EMAIL }}
+      CVIDEO_QC_RECRUITER_PASSWORD: ${{ secrets.CVIDEO_QC_RECRUITER_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Detect authenticated QC configuration
+        id: auth
+        shell: bash
+        run: |
+          if [[ -n "$CVIDEO_QC_CANDIDATE_EMAIL" && -n "$CVIDEO_QC_CANDIDATE_PASSWORD" && -n "$CVIDEO_QC_RECRUITER_EMAIL" && -n "$CVIDEO_QC_RECRUITER_PASSWORD" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Authenticated QC secrets are not configured; public browser QC will still run."
+          fi
+      - name: Provision dedicated QC identities
+        id: provision
+        if: steps.auth.outputs.configured == 'true'
+        continue-on-error: true
+        run: node scripts/qc-provision.mjs
+      - name: Prove deployed Git revision
+        if: env.CVIDEO_QC_REQUIRE_REVISION == 'true'
+        continue-on-error: true
+        run: |
+          if [[ -z "$CVIDEO_QC_EXPECTED_SHA" ]]; then
+            echo "::error::Strict deployed revision QC requires expected_sha."
+            exit 1
+          fi
+          node scripts/qc-deployed-revision.mjs
+      - name: Install browser QC runner
+        if: steps.auth.outputs.configured != 'true' || steps.provision.outcome == 'success'
+        working-directory: tests/browser-qc
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        if: steps.auth.outputs.configured != 'true' || steps.provision.outcome == 'success'
+        working-directory: tests/browser-qc
+        run: npx playwright install --with-deps chromium
+      - name: Run browser QC
+        id: playwright
+        if: steps.auth.outputs.configured != 'true' || steps.provision.outcome == 'success'
+        continue-on-error: true
+        working-directory: tests/browser-qc
+        run: npm test
+      - name: Evaluate Factory release gate
+        id: gate
+        if: always()
+        continue-on-error: true
+        env:
+          CVIDEO_QC_RESULTS: tests/browser-qc/test-results/results.json
+        run: node scripts/qc-release-gate.mjs
+      - name: Generate Defect Agent and Fix Agent handoff
+        if: always()
+        run: node scripts/qc-defect-triage.mjs
+      - name: Sync QC defects and Fix Agent queue
+        if: always() && github.event_name != 'pull_request_target'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/qc-sync-defects.mjs
+      - name: Build guarded Fix Agent execution plan
+        if: always()
+        run: node scripts/fix-agent-plan.mjs
+      - name: Upload QC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-qc-${{ github.run_id }}
+          path: |
+            tests/browser-qc/playwright-report/
+            tests/browser-qc/test-results/
+            qc-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Enforce release gate
+        if: always()
+        shell: bash
+        run: |
+          node -e "const fs=require('fs'); const g=JSON.parse(fs.readFileSync('qc-evidence/release-gate.json','utf8')); if(g.decision!=='READY_FOR_OWNER'){ console.error('Factory release blocked:', g.blockers); process.exit(1) } console.log('Factory gate: READY_FOR_OWNER')"
