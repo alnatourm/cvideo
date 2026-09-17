@@ -117,7 +117,7 @@ export function createApp(options: AppOptions = {}) {
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     if (error instanceof ZodError) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid request', details: error.flatten() } });
     if (error instanceof AuthError || error instanceof AdminError || error instanceof CandidateError || error instanceof CompanyError || error instanceof CvError || error instanceof DiscoveryError || error instanceof InterviewsError || error instanceof MediaError || error instanceof MessagingError || error instanceof SavedListsError) {
-      return res.status(error.statusCode).json({ error: { code: error.code, message: error.message } });
+      return res.status(error.status).json({ error: { code: error.code, message: error.message } });
     }
     console.error(error);
     return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
