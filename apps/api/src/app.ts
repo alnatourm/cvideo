@@ -51,6 +51,7 @@ export interface AppOptions {
   secureCookies?: boolean;
   trustProxyHops?: number;
   webDistDirectory?: string;
+  deployedRevision?: string;
 }
 
 export function createApp(options: AppOptions = {}) {
@@ -69,7 +70,12 @@ export function createApp(options: AppOptions = {}) {
   app.use(cookieParser());
 
   app.get('/api/v1/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'cvideo-api', version: 'v1' });
+    res.json({
+      status: 'ok',
+      service: 'cvideo-api',
+      version: 'v1',
+      ...(options.deployedRevision ? { revision: options.deployedRevision } : {}),
+    });
   });
 
   if (options.taxonomyService) app.use('/api/v1/taxonomy', createTaxonomyRouter(options.taxonomyService));
@@ -91,81 +97,31 @@ export function createApp(options: AppOptions = {}) {
   }
   if (options.authService && options.discoveryService) {
     app.use('/api/v1/candidate', createCandidateDiscoveryRouter(options.authService, options.discoveryService));
-    app.use('/api/v1/search/candidates', createRecruiterDiscoveryRouter(options.authService, options.discoveryService));
+    app.use('/api/v1/search', createRecruiterDiscoveryRouter(options.authService, options.discoveryService));
   }
-  if (options.authService && options.mediaService) {
-    app.use('/api/v1/candidate', createMediaRouter(options.authService, options.mediaService));
-  }
-  if (options.authService && options.savedListsService) {
-    app.use('/api/v1/saved-lists', createSavedListsRouter(options.authService, options.savedListsService));
-  }
-  if (options.authService && options.messagingService) {
-    app.use('/api/v1/conversations', createMessagingRouter(options.authService, options.messagingService));
-  }
-  if (options.authService && options.interviewsService) {
-    app.use('/api/v1/interviews', createInterviewsRouter(options.authService, options.interviewsService));
-  }
+  if (options.authService && options.interviewsService) app.use('/api/v1/interviews', createInterviewsRouter(options.authService, options.interviewsService));
+  if (options.authService && options.mediaService) app.use('/api/v1/candidate', createMediaRouter(options.authService, options.mediaService));
+  if (options.authService && options.messagingService) app.use('/api/v1', createMessagingRouter(options.authService, options.messagingService));
+  if (options.authService && options.savedListsService) app.use('/api/v1/saved-lists', createSavedListsRouter(options.authService, options.savedListsService));
 
   if (options.webDistDirectory) {
-    const webIndex = resolve(options.webDistDirectory, 'index.html');
-    app.use(express.static(options.webDistDirectory, { index: false }));
-    app.get('/{*path}', (req, res, next) => {
-      if (req.path === '/api' || req.path.startsWith('/api/')) {
-        next();
-        return;
-      }
-
-      res.sendFile(webIndex, (error) => {
-        if (error) next(error);
-      });
+    app.use(express.static(options.webDistDirectory));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) return next();
+      return res.sendFile(resolve(options.webDistDirectory!, 'index.html'));
     });
   }
 
-  app.use((_req, res) => {
-    res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found', details: {} } });
-  });
+  app.use((_req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' } }));
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-    if (
-      error instanceof AdminError ||
-      error instanceof AuthError ||
-      error instanceof CandidateError ||
-      error instanceof CompanyError ||
-      error instanceof CvError ||
-      error instanceof DiscoveryError ||
-      error instanceof InterviewsError ||
-      error instanceof MediaError ||
-      error instanceof MessagingError ||
-      error instanceof SavedListsError
-    ) {
-      res.status(error.status).json({ error: { code: error.code, message: error.message, details: {} } });
-      return;
+    if (error instanceof ZodError) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid request', details: error.flatten() } });
+    if (error instanceof AuthError || error instanceof AdminError || error instanceof CandidateError || error instanceof CompanyError || error instanceof CvError || error instanceof DiscoveryError || error instanceof InterviewsError || error instanceof MediaError || error instanceof MessagingError || error instanceof SavedListsError) {
+      return res.status(error.statusCode).json({ error: { code: error.code, message: error.message } });
     }
-
-    if (error instanceof ZodError) {
-      res.status(400).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Request validation failed',
-          details: { issues: error.issues.map((issue) => ({ path: issue.path, message: issue.message })) },
-        },
-      });
-      return;
-    }
-
-    const errorDetails = typeof error === 'object' && error !== null ? error as Record<string, unknown> : {};
-    console.error(JSON.stringify({
-      level: 'error',
-      service: 'cvideo-api',
-      message: 'unhandled_error',
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : String(error),
-      errorCode: typeof errorDetails.code === 'string' ? errorDetails.code : undefined,
-      constraint: typeof errorDetails.constraint === 'string' ? errorDetails.constraint : undefined,
-    }));
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: {} } });
+    console.error(error);
+    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
   };
-
   app.use(errorHandler);
   return app;
 }
