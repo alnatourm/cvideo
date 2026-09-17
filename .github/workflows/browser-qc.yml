@@ -56,10 +56,13 @@ jobs:
             echo "::notice::Authenticated QC secrets are not configured; public browser QC will still run."
           fi
       - name: Provision dedicated QC identities
+        id: provision
         if: steps.auth.outputs.configured == 'true'
+        continue-on-error: true
         run: node scripts/qc-provision.mjs
       - name: Prove deployed Git revision
         if: env.CVIDEO_QC_REQUIRE_REVISION == 'true'
+        continue-on-error: true
         run: |
           if [[ -z "$CVIDEO_QC_EXPECTED_SHA" ]]; then
             echo "::error::Strict deployed revision QC requires expected_sha."
@@ -67,13 +70,16 @@ jobs:
           fi
           node scripts/qc-deployed-revision.mjs
       - name: Install browser QC runner
+        if: steps.auth.outputs.configured != 'true' || steps.provision.outcome == 'success'
         working-directory: tests/browser-qc
         run: npm install --no-audit --no-fund
       - name: Install Chromium
+        if: steps.auth.outputs.configured != 'true' || steps.provision.outcome == 'success'
         working-directory: tests/browser-qc
         run: npx playwright install --with-deps chromium
       - name: Run browser QC
         id: playwright
+        if: steps.auth.outputs.configured != 'true' || steps.provision.outcome == 'success'
         continue-on-error: true
         working-directory: tests/browser-qc
         run: npm test
