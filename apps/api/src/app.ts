@@ -106,8 +106,9 @@ export function createApp(options: AppOptions = {}) {
 
   if (options.webDistDirectory) {
     app.use(express.static(options.webDistDirectory));
-    app.get('*', (req, res, next) => {
+    app.use((req, res, next) => {
       if (req.path.startsWith('/api/')) return next();
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       return res.sendFile(resolve(options.webDistDirectory!, 'index.html'));
     });
   }
