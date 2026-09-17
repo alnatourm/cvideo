@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   browser-qc:
@@ -67,6 +68,11 @@ jobs:
       - name: Generate Defect Agent and Fix Agent handoff
         if: always()
         run: node scripts/qc-defect-triage.mjs
+      - name: Sync QC defects and Fix Agent queue
+        if: always() && github.event_name != 'pull_request_target'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/qc-sync-defects.mjs
       - name: Upload QC evidence
         if: always()
         uses: actions/upload-artifact@v4
