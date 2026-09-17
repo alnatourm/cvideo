@@ -13,6 +13,15 @@ on:
         required: false
         type: boolean
         default: false
+      require_deployed_revision:
+        description: Block unless target deployment proves the expected Git SHA
+        required: false
+        type: boolean
+        default: false
+      expected_sha:
+        description: Exact 40-character Git SHA expected on the deployed target
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -25,6 +34,8 @@ jobs:
     env:
       CVIDEO_QC_BASE_URL: ${{ inputs.base_url || 'https://cvideoapi-production.up.railway.app' }}
       CVIDEO_QC_REQUIRE_AUTH: ${{ inputs.require_authenticated_qc || 'false' }}
+      CVIDEO_QC_REQUIRE_REVISION: ${{ inputs.require_deployed_revision || 'false' }}
+      CVIDEO_QC_EXPECTED_SHA: ${{ inputs.expected_sha || '' }}
       CVIDEO_QC_CANDIDATE_EMAIL: ${{ secrets.CVIDEO_QC_CANDIDATE_EMAIL }}
       CVIDEO_QC_CANDIDATE_PASSWORD: ${{ secrets.CVIDEO_QC_CANDIDATE_PASSWORD }}
       CVIDEO_QC_RECRUITER_EMAIL: ${{ secrets.CVIDEO_QC_RECRUITER_EMAIL }}
@@ -47,6 +58,14 @@ jobs:
       - name: Provision dedicated QC identities
         if: steps.auth.outputs.configured == 'true'
         run: node scripts/qc-provision.mjs
+      - name: Prove deployed Git revision
+        if: env.CVIDEO_QC_REQUIRE_REVISION == 'true'
+        run: |
+          if [[ -z "$CVIDEO_QC_EXPECTED_SHA" ]]; then
+            echo "::error::Strict deployed revision QC requires expected_sha."
+            exit 1
+          fi
+          node scripts/qc-deployed-revision.mjs
       - name: Install browser QC runner
         working-directory: tests/browser-qc
         run: npm install --no-audit --no-fund
