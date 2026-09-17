@@ -72,13 +72,15 @@ jobs:
           mkdir -p qc-evidence
           gh issue view "${{ inputs.issue_number }}" --json number,title,body,url,state > qc-evidence/fix-agent-issue.json
           node -e "const i=require('./qc-evidence/fix-agent-issue.json'); if(!i.body.includes('cvideo-qc-signature:${{ inputs.qc_signature }}')) { console.error('Issue/signature mismatch'); process.exit(1) }"
+      - name: Build bounded coding context
+        run: node scripts/fix-agent-context.mjs
       - name: Write executor claim
         shell: bash
         run: |
           node - <<'NODE'
           const fs=require('fs');
           const issue=require('./qc-evidence/fix-agent-issue.json');
-          const claim={schemaVersion:1,state:'CLAIMED',issueNumber:issue.number,issueUrl:issue.url,signature:'${{ inputs.qc_signature }}',severity:'${{ inputs.severity }}',sourceSha:'${{ inputs.source_sha }}',branch:process.env.FIX_BRANCH,baseBranch:process.env.BASE_BRANCH,runUrl:'${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',guardrails:['no direct main/release commits','no QC disabling','no assertion weakening to hide defects','no auth/security bypass','no secret exposure','no self merge','no production approval'],claimedAt:new Date().toISOString()};
+          const claim={schemaVersion:1,state:'CLAIMED',issueNumber:issue.number,issueUrl:issue.url,signature:'${{ inputs.qc_signature }}',severity:'${{ inputs.severity }}',sourceSha:'${{ inputs.source_sha }}',branch:process.env.FIX_BRANCH,baseBranch:process.env.BASE_BRANCH,taskFile:'qc-evidence/FIX_AGENT_TASK.md',contextFile:'qc-evidence/fix-agent-context.json',runUrl:'${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',guardrails:['no direct main/release commits','no QC disabling','no assertion weakening to hide defects','no auth/security bypass','no secret exposure','no self merge','no production approval'],claimedAt:new Date().toISOString()};
           fs.writeFileSync('qc-evidence/fix-agent-claim.json',JSON.stringify(claim,null,2));
           NODE
       - name: Comment claim on defect
@@ -86,7 +88,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh issue comment "${{ inputs.issue_number }}" --body "🔧 Fix Agent claimed QC signature \`${{ inputs.qc_signature }}\` on branch \`$FIX_BRANCH\`. Executor run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. The agent may prepare a repair PR but cannot self-merge or approve production."
+          gh issue comment "${{ inputs.issue_number }}" --body "🔧 Fix Agent claimed QC signature \`${{ inputs.qc_signature }}\` on branch \`$FIX_BRANCH\`. A bounded coding context has been generated from the defect contract and repository. Executor run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. The agent may prepare a repair PR but cannot self-merge or approve production."
       - name: Upload repair workspace contract
         uses: actions/upload-artifact@v4
         with:
