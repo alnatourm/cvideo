@@ -34,6 +34,26 @@ jobs:
           if [[ ! "$BRANCH" =~ ^factory/fix-([0-9]+)-([a-f0-9]{12})$ ]]; then echo 'Invalid Fix Agent branch'; exit 1; fi
           echo "issue=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
           echo "signature=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+      - name: Validate repair boundary before dependency execution
+        env:
+          CVIDEO_FIX_ISSUE: ${{ steps.identity.outputs.issue }}
+          CVIDEO_FIX_SIGNATURE: ${{ steps.identity.outputs.signature }}
+          CVIDEO_FIX_BASE: deploy/railway-staging-v1
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$CVIDEO_FIX_BASE"
+          CHANGED=$(git diff --name-only "origin/$CVIDEO_FIX_BASE...HEAD")
+          if [[ -z "$CHANGED" ]]; then echo 'Fix Agent produced no changes'; exit 1; fi
+          echo "$CHANGED"
+          if echo "$CHANGED" | grep -Eq '^(\.github/workflows/(browser-qc|fix-agent-.*)\.ya?ml|scripts/(qc-|fix-agent-).*\.mjs|docs/ai-factory/)'; then
+            echo 'Fix Agent attempted to modify protected Factory control-plane files.'
+            exit 1
+          fi
+          if ! echo "$CHANGED" | grep -Eq '(^|/)(__tests__|tests?|e2e)(/|\.|$)|\.(test|spec)\.[cm]?[jt]sx?$'; then
+            echo 'Repair must include a regression test.'
+            exit 1
+          fi
       - name: Install workspace
         run: pnpm install --frozen-lockfile
       - name: Verify repair structure
@@ -58,16 +78,16 @@ jobs:
           set -euo pipefail
           EXISTING=$(gh pr list --head "$GITHUB_REF_NAME" --base "$BASE" --state open --json number --jq '.[0].number // empty')
           if [[ -z "$EXISTING" ]]; then
-            gh pr create --draft --base "$BASE" --head "$GITHUB_REF_NAME" --title "fix(qc): repair #$ISSUE [$SIGNATURE]" --body "## Fix Agent repair\n\n- QC defect: #$ISSUE\n- QC signature: \`$SIGNATURE\`\n- Automated verification: typecheck + tests + build\n- Repair branch: \`$GITHUB_REF_NAME\`\n\nThis PR remains draft until staging Browser QC proves the repair. The Fix Agent cannot self-merge or approve production."
+            gh pr create --draft --base "$BASE" --head "$GITHUB_REF_NAME" --title "fix(qc): repair #$ISSUE [$SIGNATURE]" --body "## Fix Agent repair\n\n- QC defect: #$ISSUE\n- QC signature: \`$SIGNATURE\`\n- Automated verification: boundary check + typecheck + tests + build\n- Repair branch: \`$GITHUB_REF_NAME\`\n\nThis PR remains draft until staging Browser QC proves the repair. The Fix Agent cannot self-merge or approve production."
           else
-            gh pr comment "$EXISTING" --body "🔁 Fix Agent verification reran for \`$SIGNATURE\` at \`$GITHUB_SHA\`. Typecheck, tests and build passed."
+            gh pr comment "$EXISTING" --body "🔁 Fix Agent verification reran for \`$SIGNATURE\` at \`$GITHUB_SHA\`. Boundary validation, typecheck, tests and build passed."
           fi
       - name: Comment verification on defect
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE: ${{ steps.identity.outputs.issue }}
           SIGNATURE: ${{ steps.identity.outputs.signature }}
-        run: gh issue comment "$ISSUE" --body "✅ Fix Agent patch structure and repository verification passed for \`$SIGNATURE\` at \`$GITHUB_SHA\`. A draft repair PR is ready for staging QC."
+        run: gh issue comment "$ISSUE" --body "✅ Fix Agent patch boundary and repository verification passed for \`$SIGNATURE\` at \`$GITHUB_SHA\`. A draft repair PR is ready for staging QC."
       - name: Upload verification evidence
         uses: actions/upload-artifact@v4
         with:
