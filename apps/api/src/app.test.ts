@@ -39,12 +39,16 @@ describe('CVIDEO API foundation', () => {
     const webDirectory = await mkdtemp(join(tmpdir(), 'cvideo-web-'));
     await writeFile(join(webDirectory, 'index.html'), '<!doctype html><title>CVIDEO shell</title>');
     try {
+      expect(() => createApp({ webDistDirectory: webDirectory })).not.toThrow();
       const webResponse = await request(createApp({ webDistDirectory: webDirectory })).get('/en/company/search');
       expect(webResponse.status).toBe(200);
       expect(webResponse.text).toContain('CVIDEO shell');
       const apiResponse = await request(createApp({ webDistDirectory: webDirectory })).get('/api/v1/unknown');
       expect(apiResponse.status).toBe(404);
       expect(apiResponse.body.error.code).toBe('NOT_FOUND');
+      const postResponse = await request(createApp({ webDistDirectory: webDirectory })).post('/en/company/search');
+      expect(postResponse.status).toBe(404);
+      expect(postResponse.body.error.code).toBe('NOT_FOUND');
     } finally {
       await rm(webDirectory, { recursive: true, force: true });
     }
