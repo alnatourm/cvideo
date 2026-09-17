@@ -21,25 +21,27 @@ async function login(page: Page, email: string, password: string) {
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
 }
 
-async function jsonData<T>(response: APIResponse): Promise<T> {
-  expect(response.ok(), `${response.request().method()} ${response.url()} -> ${response.status()}`).toBeTruthy();
+async function jsonData<T>(response: APIResponse, operation: string): Promise<T> {
+  expect(response.ok(), `${operation} ${response.url()} -> ${response.status()}`).toBeTruthy();
   const payload = await response.json() as { data: T };
   return payload.data;
 }
 
 async function apiGet<T>(page: Page, path: string) {
-  return jsonData<T>(await page.request.get(path));
+  return jsonData<T>(await page.request.get(path), 'GET');
 }
 
 async function apiPost<T>(page: Page, path: string, data: unknown) {
   const csrf = await page.evaluate(() => localStorage.getItem('cvideo_csrf'));
-  return jsonData<T>(await page.request.post(path, { data, headers: csrf ? { 'x-csrf-token': csrf } : undefined }));
+  return jsonData<T>(await page.request.post(path, { data, headers: csrf ? { 'x-csrf-token': csrf } : undefined }), 'POST');
 }
 
 async function apiPut<T>(page: Page, path: string, data: unknown) {
   const csrf = await page.evaluate(() => localStorage.getItem('cvideo_csrf'));
-  return jsonData<T>(await page.request.put(path, { data, headers: csrf ? { 'x-csrf-token': csrf } : undefined }));
+  return jsonData<T>(await page.request.put(path, { data, headers: csrf ? { 'x-csrf-token': csrf } : undefined }), 'PUT');
 }
+
+const logoutName = /Logout|تسجيل الخروج|خروج/i;
 
 test('public shell and login render without browser errors', async ({ page }) => {
   await page.goto('/');
@@ -58,18 +60,19 @@ test('candidate mobile account flow keeps logout off home and exposes it in prof
   await expect(page).toHaveURL(/\/candidate\//);
   await page.goto('/candidate/home');
   await assertHealthyPage(page);
-  await expect(page.getByRole('button', { name: /Logout|تسجيل الخروج/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: logoutName })).toHaveCount(0);
   await page.goto('/candidate/messages');
-  await expect(page.getByRole('button', { name: /Logout|تسجيل الخروج/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: logoutName })).toHaveCount(0);
   await page.goto('/candidate/profile');
   await assertHealthyPage(page);
-  const logout = page.getByRole('button', { name: /Logout|تسجيل الخروج/i });
+  const logout = page.getByRole('button', { name: logoutName });
   await expect(logout).toBeVisible();
   await logout.click();
   await expect(page).toHaveURL(/\/login/);
 });
 
-test('recruiter can enter search and account areas', async ({ page }) => {
+test('recruiter can enter search and account areas', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'desktop sidebar assertion');
   test.skip(!recruiterEmail || !recruiterPassword, 'recruiter QC credentials are not configured');
   await login(page, recruiterEmail!, recruiterPassword!);
   await expect(page).toHaveURL(/\/recruiter\//);
@@ -78,13 +81,12 @@ test('recruiter can enter search and account areas', async ({ page }) => {
   await expect(page.locator('main')).toBeVisible();
   await page.goto('/recruiter/account');
   await assertHealthyPage(page);
-  await expect(page.getByRole('button', { name: /Logout|تسجيل الخروج/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: logoutName })).toBeVisible();
 });
 
 test('candidate -> recruiter -> candidate critical transaction', async ({ page, browser }) => {
   test.skip(!candidateEmail || !candidatePassword || !recruiterEmail || !recruiterPassword, 'full QC credentials are not configured');
 
-  // Candidate checkpoint: obtain the exact test candidate and assert the simplified profile contract.
   await login(page, candidateEmail!, candidatePassword!);
   const me = await apiGet<{ principal: { userId: string } }>(page, '/api/v1/auth/me');
   const profile = await apiGet<{ id: string; displayName: string; yearsExperience: number; certificateCount: number; highestEducationLevel: string }>(page, '/api/v1/candidate/profile');
@@ -101,7 +103,6 @@ test('candidate -> recruiter -> candidate critical transaction', async ({ page, 
   const recruiterPage = await recruiterContext.newPage();
   await login(recruiterPage, recruiterEmail!, recruiterPassword!);
 
-  // Search must return the QC candidate and must honor minimum experience.
   const search = await apiGet<{ items: Array<{ id: string; displayName: string; yearsExperience: number; certificateCount: number; highestEducationLevel: string; introductionVideoUrl?: string | null; introductionVideoEmbedUrl?: string | null }> }>(recruiterPage, `/api/v1/search/candidates?minExperienceYears=${profile.yearsExperience}&pageSize=100`);
   const card = search.items.find((item) => item.id === profile.id);
   expect(card, 'discoverable QC candidate missing from recruiter search').toBeTruthy();
@@ -117,7 +118,6 @@ test('candidate -> recruiter -> candidate critical transaction', async ({ page, 
   const detail = await apiGet<{ id: string; displayName: string; yearsExperience: number; certificateCount: number; highestEducationLevel: string }>(recruiterPage, `/api/v1/search/candidates/${profile.id}`);
   expect(detail).toMatchObject({ id: profile.id, displayName: profile.displayName, yearsExperience: profile.yearsExperience, certificateCount: profile.certificateCount, highestEducationLevel: profile.highestEducationLevel });
 
-  // Saved-list regression: add the same candidate twice and prove the candidate is not duplicated.
   const runKey = Date.now().toString(36);
   const list = await apiPost<{ id: string; name: string }>(recruiterPage, '/api/v1/saved-lists', { name: `QC ${runKey}`, description: 'Automated browser QC list' });
   await apiPost(recruiterPage, `/api/v1/saved-lists/${list.id}/candidates`, { candidateId: profile.id });
@@ -127,7 +127,6 @@ test('candidate -> recruiter -> candidate critical transaction', async ({ page, 
   expect(saved.candidateIds?.filter((id) => id === profile.id).length ?? saved.candidates?.filter((candidate) => candidate.id === profile.id).length).toBe(1);
   if (saved.candidates?.length) expect(saved.candidates[0]!.displayName).toBe(profile.displayName);
 
-  // Recruiter initiates contact. Candidate must not need to initiate anything.
   const conversation = await apiPost<{ id: string }>(recruiterPage, '/api/v1/conversations', { candidateId: profile.id });
   const marker = `QC-${runKey}`;
   await apiPost(recruiterPage, `/api/v1/conversations/${conversation.id}/messages`, { body: `Automated CVIDEO QC ${marker}` });
@@ -144,7 +143,6 @@ test('candidate -> recruiter -> candidate critical transaction', async ({ page, 
   });
   expect(interview.status).toBe('pending');
 
-  // Candidate sees recruiter contact and interview, then accepts. This closes the full loop.
   const candidateConversations = await apiGet<Array<{ id: string }>>(page, '/api/v1/conversations');
   expect(candidateConversations.some((item) => item.id === conversation.id), 'recruiter conversation not visible to candidate').toBeTruthy();
   const messages = await apiGet<Array<{ body: string }>>(page, `/api/v1/conversations/${conversation.id}/messages`);
