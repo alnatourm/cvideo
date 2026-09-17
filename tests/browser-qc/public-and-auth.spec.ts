@@ -103,7 +103,9 @@ test('candidate -> recruiter -> candidate critical transaction', async ({ page, 
   const recruiterPage = await recruiterContext.newPage();
   await login(recruiterPage, recruiterEmail!, recruiterPassword!);
 
-  const search = await apiGet<{ items: Array<{ id: string; displayName: string; yearsExperience: number; certificateCount: number; highestEducationLevel: string; introductionVideoUrl?: string | null; introductionVideoEmbedUrl?: string | null }> }>(recruiterPage, `/api/v1/search/candidates?minExperienceYears=${profile.yearsExperience}&pageSize=100`);
+  // DiscoveryService intentionally caps pageSize at 50. Keep QC inside the public API contract
+  // so a validation error cannot masquerade as a recruiter-search product defect.
+  const search = await apiGet<{ items: Array<{ id: string; displayName: string; yearsExperience: number; certificateCount: number; highestEducationLevel: string; introductionVideoUrl?: string | null; introductionVideoEmbedUrl?: string | null }> }>(recruiterPage, `/api/v1/search/candidates?minExperienceYears=${profile.yearsExperience}&pageSize=50`);
   const card = search.items.find((item) => item.id === profile.id);
   expect(card, 'discoverable QC candidate missing from recruiter search').toBeTruthy();
   expect(card!.displayName).toBe(profile.displayName);
@@ -112,7 +114,7 @@ test('candidate -> recruiter -> candidate critical transaction', async ({ page, 
   expect(card!.highestEducationLevel).toBe(profile.highestEducationLevel);
   expect(card!.introductionVideoUrl || card!.introductionVideoEmbedUrl, 'candidate introduction video is not playable/discoverable').toBeTruthy();
 
-  const tooExperienced = await apiGet<{ items: Array<{ id: string }> }>(recruiterPage, `/api/v1/search/candidates?minExperienceYears=${profile.yearsExperience + 1}&pageSize=100`);
+  const tooExperienced = await apiGet<{ items: Array<{ id: string }> }>(recruiterPage, `/api/v1/search/candidates?minExperienceYears=${profile.yearsExperience + 1}&pageSize=50`);
   expect(tooExperienced.items.some((item) => item.id === profile.id), 'minimum-experience filter did not exclude the QC candidate').toBeFalsy();
 
   const detail = await apiGet<{ id: string; displayName: string; yearsExperience: number; certificateCount: number; highestEducationLevel: string }>(recruiterPage, `/api/v1/search/candidates/${profile.id}`);
