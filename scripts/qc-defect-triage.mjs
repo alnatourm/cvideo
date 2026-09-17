@@ -15,36 +15,29 @@ function severity(failure) {
   return 'LOW';
 }
 
-const defects = (gate.failures || []).map((failure) => {
+const infrastructureBlocked = (gate.blockers || []).some((b) => ['qc-configuration-invalid','qc-provisioning-failed','browser-qc-not-executed','deployed-commit-not-proven'].includes(b));
+const defects = infrastructureBlocked ? [] : (gate.failures || []).map((failure) => {
   const sev = severity(failure);
   const signatureSource = `${failure.project || 'unknown'}|${failure.title || 'unknown'}`.toLowerCase().replace(/\s+/g, ' ').trim();
   const signature = crypto.createHash('sha256').update(signatureSource).digest('hex').slice(0, 12);
   return {
-    signature,
-    severity: sev,
-    title: `[QC][${sev}] ${failure.title || 'Browser QC failure'}`,
-    project: failure.project || 'unknown',
-    testedSha: gate.testedSha,
-    target: gate.baseUrl,
-    errors: failure.errors || [],
+    signature, severity: sev, title: `[QC][${sev}] ${failure.title || 'Browser QC failure'}`, project: failure.project || 'unknown',
+    testedSha: gate.testedSha, target: gate.baseUrl, errors: failure.errors || [],
     reproduction: `Run Browser QC scenario "${failure.title || 'unknown'}" on ${failure.project || 'unknown'} against ${gate.baseUrl}.`,
     expected: 'Mandatory CVIDEO journey completes without regression.',
     actual: (failure.errors || []).join('\n').slice(0, 4000) || 'Browser QC scenario failed.',
     fixAgent: {
-      allowed: ['inspect evidence', 'reproduce', 'change scoped application/test code', 'add regression test', 'open pull request'],
-      forbidden: ['disable QC', 'weaken assertion to hide defect', 'expose secrets', 'auto-merge production', 'bypass release gate'],
-      completion: ['root cause documented', 'regression test added or strengthened', 'CI green', 'Browser QC green', 'release gate reevaluated'],
+      allowed: ['inspect evidence','reproduce','change scoped application/test code','add regression test','open pull request'],
+      forbidden: ['disable QC','weaken assertion to hide defect','expose secrets','auto-merge production','bypass release gate'],
+      completion: ['root cause documented','regression test added or strengthened','CI green','Browser QC green','release gate reevaluated'],
     },
   };
 });
 
 const handoff = {
-  schemaVersion: 1,
-  gateDecision: gate.decision,
-  testedSha: gate.testedSha,
-  target: gate.baseUrl,
-  defects,
-  nextAction: defects.length ? 'DEFECT_AGENT_CREATE_OR_UPDATE_ISSUES' : 'NO_DEFECT_HANDOFF',
+  schemaVersion: 2, gateDecision: gate.decision, testedSha: gate.testedSha, target: gate.baseUrl, defects,
+  infrastructureIncident: infrastructureBlocked ? { blockers: gate.blockers, provisioning: gate.provisioning || null } : null,
+  nextAction: infrastructureBlocked ? 'FACTORY_INFRASTRUCTURE_REPAIR' : (defects.length ? 'DEFECT_AGENT_CREATE_OR_UPDATE_ISSUES' : 'NO_DEFECT_HANDOFF'),
   generatedAt: new Date().toISOString(),
 };
 fs.mkdirSync('qc-evidence', { recursive: true });
