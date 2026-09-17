@@ -24,24 +24,25 @@ jobs:
       CVIDEO_QC_RECRUITER_PASSWORD: ${{ secrets.CVIDEO_QC_RECRUITER_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.15.1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - name: Public browser QC
-        run: pnpm qc:browser
+      - name: Install browser QC runner
+        working-directory: tests/browser-qc
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        working-directory: tests/browser-qc
+        run: npx playwright install --with-deps chromium
+      - name: Run browser QC
+        working-directory: tests/browser-qc
+        run: npm test
       - name: Upload QC evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: browser-qc-${{ github.run_id }}
           path: |
-            playwright-report/
-            test-results/
+            tests/browser-qc/playwright-report/
+            tests/browser-qc/test-results/
           if-no-files-found: ignore
           retention-days: 14
