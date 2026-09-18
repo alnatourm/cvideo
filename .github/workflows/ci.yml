@@ -38,9 +38,21 @@ jobs:
         with:
           node-version: 24
       - name: Enable pnpm
+        shell: bash
         run: |
+          set -euo pipefail
           corepack enable
-          corepack prepare pnpm@10.15.1 --activate
+          for attempt in 1 2 3 4; do
+            if corepack prepare pnpm@10.15.1 --activate; then
+              pnpm --version
+              exit 0
+            fi
+            if [[ "$attempt" -lt 4 ]]; then
+              sleep $((attempt * 3))
+            fi
+          done
+          npm install --global pnpm@10.15.1
+          pnpm --version
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Typecheck
