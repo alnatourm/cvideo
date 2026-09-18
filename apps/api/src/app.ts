@@ -101,7 +101,7 @@ export function createApp(options: AppOptions = {}) {
   }
   if (options.authService && options.interviewsService) app.use('/api/v1/interviews', createInterviewsRouter(options.authService, options.interviewsService));
   if (options.authService && options.mediaService) app.use('/api/v1/candidate', createMediaRouter(options.authService, options.mediaService));
-  if (options.authService && options.messagingService) app.use('/api/v1', createMessagingRouter(options.authService, options.messagingService));
+  if (options.authService && options.messagingService) app.use('/api/v1/conversations', createMessagingRouter(options.authService, options.messagingService));
   if (options.authService && options.savedListsService) app.use('/api/v1/saved-lists', createSavedListsRouter(options.authService, options.savedListsService));
 
   if (options.webDistDirectory) {
