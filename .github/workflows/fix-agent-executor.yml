@@ -1,6 +1,20 @@
 name: Fix Agent Executor
 
 on:
+  workflow_call:
+    inputs:
+      issue_number:
+        required: true
+        type: number
+      qc_signature:
+        required: true
+        type: string
+      source_sha:
+        required: true
+        type: string
+      severity:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       issue_number:
