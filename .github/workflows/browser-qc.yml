@@ -30,13 +30,15 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
   issues: write
-  actions: write
 
 jobs:
   browser-qc:
     runs-on: ubuntu-latest
+    outputs:
+      fix_matrix: ${{ steps.fix_matrix.outputs.matrix }}
     timeout-minutes: 15
     env:
       CVIDEO_QC_BASE_URL: ${{ inputs.base_url || 'https://cvideoapi-production.up.railway.app' }}
@@ -128,31 +130,29 @@ jobs:
       - name: Build guarded Fix Agent execution plan
         if: always()
         run: node scripts/fix-agent-plan.mjs
-      - name: Auto-claim queued Fix Agent work
+      - name: Publish Fix Agent matrix
+        id: fix_matrix
         if: always() && github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          set -euo pipefail
-          node - <<'NODE' > /tmp/fix-agent-dispatch.tsv
+          node - <<'NODE' >> "$GITHUB_OUTPUT"
           const fs = require('fs');
-          const p = JSON.parse(fs.readFileSync('qc-evidence/fix-agent-plan.json', 'utf8'));
-          for (const x of p.plans || []) {
-            if (x.state === 'READY_TO_CLAIM') {
-              console.log([x.issueNumber, x.signature, x.sourceSha, x.severity].join('\t'));
-            }
+          const path = 'qc-evidence/fix-agent-plan.json';
+          if (!fs.existsSync(path)) {
+            console.log('matrix=[]');
+            process.exit(0);
           }
+          const p = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const matrix = (p.plans || [])
+            .filter((x) => x.state === 'READY_TO_CLAIM')
+            .map((x) => ({
+              issue_number: x.issueNumber,
+              qc_signature: x.signature,
+              source_sha: x.sourceSha,
+              severity: x.severity
+            }));
+          console.log('matrix=' + JSON.stringify(matrix));
           NODE
-          while IFS=$'\t' read -r issue signature source severity; do
-            [[ -z "${issue:-}" ]] && continue
-            echo "Dispatching Fix Agent for issue #$issue ($signature)"
-            gh workflow run fix-agent-executor.yml --ref deploy/railway-staging-v1 \
-              -f issue_number="$issue" \
-              -f qc_signature="$signature" \
-              -f source_sha="$source" \
-              -f severity="$severity"
-          done < /tmp/fix-agent-dispatch.tsv
       - name: Upload QC evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -169,3 +169,18 @@ jobs:
         shell: bash
         run: |
           node -e "const fs=require('fs'); const g=JSON.parse(fs.readFileSync('qc-evidence/release-gate.json','utf8')); if(g.decision!=='READY_FOR_OWNER'){ console.error('Factory release blocked:', g.blockers); process.exit(1) } console.log('Factory gate: READY_FOR_OWNER')"
+
+  fix-agent:
+    needs: browser-qc
+    if: ${{ always() && needs.browser-qc.outputs.fix_matrix != '' && needs.browser-qc.outputs.fix_matrix != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.browser-qc.outputs.fix_matrix) }}
+    uses: ./.github/workflows/fix-agent-executor.yml
+    with:
+      issue_number: ${{ matrix.issue_number }}
+      qc_signature: ${{ matrix.qc_signature }}
+      source_sha: ${{ matrix.source_sha }}
+      severity: ${{ matrix.severity }}
+    secrets: inherit
