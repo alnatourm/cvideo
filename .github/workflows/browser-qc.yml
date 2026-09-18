@@ -144,23 +144,7 @@ jobs:
             }
           }
           NODE
-          while IFS=      - name: Upload QC evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: browser-qc-${{ github.run_id }}
-          path: |
-            tests/browser-qc/playwright-report/
-            tests/browser-qc/test-results/
-            qc-evidence/
-          if-no-files-found: ignore
-          retention-days: 14
-      - name: Enforce release gate
-        if: always()
-        shell: bash
-        run: |
-          node -e "const fs=require('fs'); const g=JSON.parse(fs.readFileSync('qc-evidence/release-gate.json','utf8')); if(g.decision!=='READY_FOR_OWNER'){ console.error('Factory release blocked:', g.blockers); process.exit(1) } console.log('Factory gate: READY_FOR_OWNER')"
-\t' read -r issue signature source severity; do
+          while IFS=$'\t' read -r issue signature source severity; do
             [[ -z "${issue:-}" ]] && continue
             echo "Dispatching Fix Agent for issue #$issue ($signature)"
             gh workflow run fix-agent-executor.yml --ref deploy/railway-staging-v1 \
