@@ -97,7 +97,7 @@ export function createApp(options: AppOptions = {}) {
   }
   if (options.authService && options.discoveryService) {
     app.use('/api/v1/candidate', createCandidateDiscoveryRouter(options.authService, options.discoveryService));
-    app.use('/api/v1/search', createRecruiterDiscoveryRouter(options.authService, options.discoveryService));
+    app.use('/api/v1/search/candidates', createRecruiterDiscoveryRouter(options.authService, options.discoveryService));
   }
   if (options.authService && options.interviewsService) app.use('/api/v1/interviews', createInterviewsRouter(options.authService, options.interviewsService));
   if (options.authService && options.mediaService) app.use('/api/v1/candidate', createMediaRouter(options.authService, options.mediaService));
