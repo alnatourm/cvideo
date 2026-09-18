@@ -38,9 +38,21 @@ jobs:
         with:
           node-version: 24
       - name: Enable pnpm
+        shell: bash
         run: |
+          set -euo pipefail
           corepack enable
-          corepack prepare pnpm@10.15.1 --activate
+          for attempt in 1 2 3 4; do
+            if corepack prepare pnpm@10.15.1 --activate; then
+              pnpm --version
+              exit 0
+            fi
+            if [[ "$attempt" -lt 4 ]]; then
+              sleep $((attempt * 3))
+            fi
+          done
+          npm install --global pnpm@10.15.1
+          pnpm --version
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Typecheck
@@ -51,13 +63,9 @@ jobs:
         run: pnpm test
       - name: Apply database migrations
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0001_candidate_profile_core.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0002_identity_tenant_security.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0003_candidate_discovery_settings.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0004_saved_lists.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0005_messaging.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0006_interviews.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0007_company_verification_admin.sql
+          pnpm --filter @cvideo/api db:migrate
+          pnpm --filter @cvideo/api db:migrate
+          psql "$DATABASE_URL" -Atc "select count(*) from cvideo_schema_migrations;" | grep -qx 20
       - name: Verify migrated schema and security relationships
         run: |
           psql "$DATABASE_URL" -Atc "select to_regclass('public.candidate_profiles');" | grep -qx candidate_profiles
@@ -80,11 +88,23 @@ jobs:
           psql "$DATABASE_URL" -Atc "select count(*) from pg_indexes where indexname = 'conversations_company_candidate_unique' and indexdef ilike 'CREATE UNIQUE INDEX%';" | grep -qx 1
           psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conrelid = 'public.interviews'::regclass and contype in ('c','f');" | grep -qE '^[4-9][0-9]*$'
           psql "$DATABASE_URL" -Atc "select count(*) from information_schema.columns where table_name = 'companies' and column_name = 'operational_status';" | grep -qx 1
-      - name: Smoke test compiled API
-        env:
-          CVIDEO_SMOKE_API_ORIGIN: http://127.0.0.1:4000
-          NODE_ENV: production
-          PORT: 4000
+          psql "$DATABASE_URL" -Atc "select count(*) from information_schema.columns where table_name = 'candidate_profiles' and column_name in ('certificate_count', 'highest_education_level');" | grep -qx 2
+          psql "$DATABASE_URL" -Atc "select count(*) from pg_constraint where conname in ('candidate_profiles_certificate_count_check', 'candidate_profiles_highest_education_check');" | grep -qx 2
+          psql "$DATABASE_URL" -Atc "select count(*) from categories where code like 'F___';" | grep -qx 50
+          psql "$DATABASE_URL" -Atc "select count(*) from subcategories where code like 'SF____';" | grep -qx 238
+          psql "$DATABASE_URL" -Atc "select count(*) from job_titles where code like 'JT_____';" | grep -qx 1016
+          psql "$DATABASE_URL" -Atc "select count(*) from skills where code like 'SK____';" | grep -qx 400
+          psql "$DATABASE_URL" -Atc "select count(*) from job_title_aliases where code like 'JA_____';" | grep -qx 3613
+          psql "$DATABASE_URL" -Atc "select count(*) from job_title_skills;" | grep -qx 5080
+          psql "$DATABASE_URL" -Atc "select count(*) from languages where is_active = true;" | grep -qx 30
+      - name: Build deployment image
+        run: docker build --tag cvideo:ci .
+      - name: Smoke test deployment image
         run: |
-          pnpm --filter @cvideo/api start > /tmp/cvideo-api.log 2>&1 &
+          docker run --detach --rm --name cvideo-ci \
+            --env DATABASE_URL=postgres://cvideo:cvideo@127.0.0.1:65432/cvideo \
+            --publish 4000:3000 \
+            cvideo:ci
+          CVIDEO_SMOKE_API_ORIGIN=http://127.0.0.1:4000 \
+          CVIDEO_SMOKE_WEB_ORIGIN=http://127.0.0.1:4000 \
           pnpm smoke:release

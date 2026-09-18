@@ -1,0 +1,150 @@
+name: Fix Agent Executor
+
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        required: true
+        type: number
+      qc_signature:
+        required: true
+        type: string
+      source_sha:
+        required: true
+        type: string
+      severity:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: QC defect issue number to claim
+        required: true
+        type: number
+      qc_signature:
+        description: Stable QC defect signature
+        required: true
+        type: string
+      source_sha:
+        description: Commit SHA that failed QC
+        required: true
+        type: string
+      severity:
+        description: BLOCKER, HIGH, MEDIUM or LOW
+        required: true
+        type: choice
+        options: [BLOCKER, HIGH, MEDIUM, LOW]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: fix-agent-${{ inputs.issue_number }}-${{ inputs.qc_signature }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FIX_BRANCH: factory/fix-${{ inputs.issue_number }}-${{ inputs.qc_signature }}
+      BASE_BRANCH: deploy/railway-staging-v1
+      FIX_AGENT_LLM_ENDPOINT: ${{ vars.FIX_AGENT_LLM_ENDPOINT }}
+      FIX_AGENT_LLM_MODEL: ${{ vars.FIX_AGENT_LLM_MODEL }}
+      FIX_AGENT_LLM_API_KEY: ${{ secrets.FIX_AGENT_LLM_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE_BRANCH }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate claim
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ inputs.qc_signature }}" =~ ^[a-f0-9]{12}$ ]] || { echo 'Invalid QC signature'; exit 1; }
+          git cat-file -e "${{ inputs.source_sha }}^{commit}" || { echo 'Source SHA is not present in repository'; exit 1; }
+          if [[ "$FIX_BRANCH" == "main" || "$FIX_BRANCH" == "$BASE_BRANCH" ]]; then exit 1; fi
+      - name: Create isolated repair branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$FIX_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$FIX_BRANCH:$FIX_BRANCH"
+            git checkout "$FIX_BRANCH"
+          else
+            git checkout -b "$FIX_BRANCH"
+            git push -u origin "$FIX_BRANCH"
+          fi
+      - name: Fetch defect contract
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qc-evidence
+          gh issue view "${{ inputs.issue_number }}" --json number,title,body,url,state > qc-evidence/fix-agent-issue.json
+          node -e "const i=require('./qc-evidence/fix-agent-issue.json'); if(!i.body.includes('cvideo-qc-signature:${{ inputs.qc_signature }}')) { console.error('Issue/signature mismatch'); process.exit(1) }"
+      - name: Validate Fix Agent AI provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${FIX_AGENT_LLM_ENDPOINT:-}" ]] || missing+=(FIX_AGENT_LLM_ENDPOINT)
+          [[ -n "${FIX_AGENT_LLM_MODEL:-}" ]] || missing+=(FIX_AGENT_LLM_MODEL)
+          [[ -n "${FIX_AGENT_LLM_API_KEY:-}" ]] || missing+=(FIX_AGENT_LLM_API_KEY)
+          if (( ${#missing[@]} > 0 )); then
+            printf '{"schemaVersion":1,"state":"NEEDS_FACTORY_CONFIGURATION","missing":["%s"]}\n' "$(IFS='","'; echo "${missing[*]}")" > qc-evidence/fix-agent-provider.json
+            gh issue comment "${{ inputs.issue_number }}" --body "⚠️ Fix Agent could not start AI repair because its provider configuration is incomplete. Missing: `${missing[*]}`. No product code was changed."
+            exit 1
+          fi
+          printf '{"schemaVersion":1,"state":"READY","endpointConfigured":true,"modelConfigured":true,"apiKeyConfigured":true}\n' > qc-evidence/fix-agent-provider.json
+      - name: Generate AI repair patch
+        run: node scripts/fix-agent-brain.mjs
+      - name: Reject protected-control edits before commit
+        env:
+          CVIDEO_FIX_BASE: ${{ env.BASE_BRANCH }}
+          CVIDEO_FIX_ISSUE: ${{ inputs.issue_number }}
+          CVIDEO_FIX_SIGNATURE: ${{ inputs.qc_signature }}
+        run: node scripts/fix-agent-verify.mjs
+      - name: Commit and push AI repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'cvideo-fix-agent'
+          git config user.email 'cvideo-fix-agent@users.noreply.github.com'
+          git add -A
+          git reset qc-evidence/ || true
+          git diff --cached --quiet && { echo 'No repair changes to commit'; exit 1; }
+          git commit -m "fix(qc): repair #${{ inputs.issue_number }} [${{ inputs.qc_signature }}]"
+          git push origin "$FIX_BRANCH"
+      - name: Write executor claim
+        if: always()
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const issue=require('./qc-evidence/fix-agent-issue.json');
+          const claim={schemaVersion:1,state:'PATCH_PUSHED',issueNumber:issue.number,issueUrl:issue.url,signature:'${{ inputs.qc_signature }}',severity:'${{ inputs.severity }}',sourceSha:'${{ inputs.source_sha }}',branch:process.env.FIX_BRANCH,baseBranch:process.env.BASE_BRANCH,runUrl:'${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',guardrails:['no direct main/release commits','no QC disabling','no assertion weakening to hide defects','no auth/security bypass','no secret exposure','no self merge','no production approval'],claimedAt:new Date().toISOString()};
+          fs.writeFileSync('qc-evidence/fix-agent-claim.json',JSON.stringify(claim,null,2));
+          NODE
+      - name: Comment repair on defect
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh issue comment "${{ inputs.issue_number }}" --body "🔧 Fix Agent generated and pushed a guarded AI repair for QC signature \`${{ inputs.qc_signature }}\` on \`$FIX_BRANCH\`. The repair must now pass the independent Fix Agent Verify + PR workflow before staging QC."
+      - name: Upload repair workspace contract
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fix-agent-repair-${{ inputs.issue_number }}-${{ inputs.qc_signature }}
+          path: qc-evidence/
+          retention-days: 14

@@ -1,4 +1,6 @@
 import { createApp } from './app.js';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { DrizzleCompanyVerificationRepository } from './admin/drizzle-repository.js';
 import { CompanyVerificationService } from './admin/service.js';
 import { DrizzleAuthRepository } from './auth/drizzle-repository.js';
@@ -34,25 +36,23 @@ const companyVerificationService = new CompanyVerificationService(new DrizzleCom
 const candidateService = new CandidateService(new DrizzleCandidateRepository(db));
 const companyService = new CompanyService(new DrizzleCompanyRepository(db));
 const cvStorageDirectory = process.env.CV_DOCUMENT_STORAGE_DIR?.trim();
-const documentProvider = cvStorageDirectory
-  ? new FilesystemDocumentProvider(cvStorageDirectory)
-  : new DeferredDocumentProvider();
+const documentProvider = cvStorageDirectory ? new FilesystemDocumentProvider(cvStorageDirectory) : new DeferredDocumentProvider();
 const cvService = new CvService(new DrizzleCvRepository(db), documentProvider);
-const discoveryService = new DiscoveryService(new DrizzleDiscoveryRepository(db));
 const interviewsService = new InterviewsService(new DrizzleInterviewsRepository(db), new DeferredGoogleMeetProvider());
-
 const bunnyLibraryId = process.env.BUNNY_STREAM_LIBRARY_ID;
 const bunnyApiKey = process.env.BUNNY_STREAM_API_KEY;
 const bunnyCdnHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
-const videoProvider =
-  bunnyLibraryId && bunnyApiKey && bunnyCdnHostname
-    ? new BunnyStreamVideoProvider({ libraryId: bunnyLibraryId, apiKey: bunnyApiKey, cdnHostname: bunnyCdnHostname })
-    : new DeferredVideoProvider();
+const videoProvider = bunnyLibraryId && bunnyApiKey && bunnyCdnHostname
+  ? new BunnyStreamVideoProvider({ libraryId: bunnyLibraryId, apiKey: bunnyApiKey, cdnHostname: bunnyCdnHostname })
+  : new DeferredVideoProvider();
+const discoveryService = new DiscoveryService(new DrizzleDiscoveryRepository(db), videoProvider);
 const mediaService = new MediaService(new DrizzleMediaRepository(db), videoProvider);
-
 const messagingService = new MessagingService(new DrizzleMessagingRepository(db));
 const savedListsService = new SavedListsService(new DrizzleSavedListsRepository(db));
 const taxonomyService = new TaxonomyService(new DrizzleTaxonomyRepository(db));
+const webDistDirectory = fileURLToPath(new URL('../../web/dist/', import.meta.url));
+const serveWeb = existsSync(fileURLToPath(new URL('index.html', new URL('../../web/dist/', import.meta.url))));
+const deployedRevision = (process.env.CVIDEO_DEPLOY_REVISION ?? process.env.RAILWAY_GIT_COMMIT_SHA ?? '').trim() || undefined;
 const app = createApp({
   authService,
   companyVerificationService,
@@ -65,10 +65,13 @@ const app = createApp({
   messagingService,
   savedListsService,
   taxonomyService,
+  trustProxyHops: process.env.NODE_ENV === 'production' ? 1 : undefined,
+  webDistDirectory: serveWeb ? webDistDirectory : undefined,
+  deployedRevision,
 });
 
 const server = app.listen(port, () => {
-  console.log(JSON.stringify({ level: 'info', service: 'cvideo-api', message: 'server_started', port }));
+  console.log(JSON.stringify({ level: 'info', service: 'cvideo-api', message: 'server_started', port, deployedRevision: deployedRevision ?? null }));
 });
 
 async function shutdown(signal: string) {

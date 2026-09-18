@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "name": "OGroup AI Factory",
+  "version": "1.0.0",
+  "status": "frozen-baseline",
+  "referenceProduct": "CVIDEO",
+  "ownerGate": "READY_FOR_OWNER",
+  "maxAutomaticFixAttempts": 3,
+  "agents": [
+    "orchestrator",
+    "lead-business",
+    "product-ba",
+    "architecture",
+    "ui-ux",
+    "build",
+    "code-review",
+    "security",
+    "test",
+    "deploy-devops",
+    "qc",
+    "defect",
+    "fix",
+    "release-gate",
+    "support",
+    "learning"
+  ],
+  "releaseStates": [
+    "BLOCKED",
+    "READY_FOR_OWNER"
+  ],
+  "escalationStates": [
+    "RETRYABLE",
+    "NEEDS_FACTORY_CONFIGURATION",
+    "NEEDS_HUMAN_ENGINEERING",
+    "BLOCKED_BY_EXTERNAL_SERVICE",
+    "READY_FOR_NEXT_AGENT"
+  ],
+  "mandatorySequence": [
+    "lead-business",
+    "product-ba",
+    "architecture",
+    "ui-ux",
+    "build",
+    "code-review",
+    "security",
+    "test",
+    "deploy-devops",
+    "qc",
+    "release-gate",
+    "owner"
+  ],
+  "repairLoop": [
+    "qc",
+    "defect",
+    "fix",
+    "verification",
+    "staging",
+    "qc",
+    "release-gate"
+  ],
+  "proofNext": "PRODUCT_2_END_TO_END"
+}

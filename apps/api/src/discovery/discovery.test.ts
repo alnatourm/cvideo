@@ -14,12 +14,14 @@ class MemoryDiscoveryRepository implements DiscoveryRepository {
     hasSkill: true,
   };
   visible = false;
+  lastSearchFilters: RecruiterSearchFilters | null = null;
 
   async getReadinessByUserId() { return this.readiness; }
   async getVisibilityByUserId() { return this.visible; }
   async setVisibilityByUserId(_userId: string, discoverable: boolean) { this.visible = discoverable; return this.visible; }
 
   async searchCandidates(filters: RecruiterSearchFilters) {
+    this.lastSearchFilters = filters;
     return {
       items: [{
         id: '11111111-1111-4111-8111-111111111111',
@@ -28,6 +30,8 @@ class MemoryDiscoveryRepository implements DiscoveryRepository {
         countryCode: filters.countryCode ?? 'JO',
         city: 'Amman',
         yearsExperience: 8,
+        certificateCount: 4,
+        highestEducationLevel: 'bachelor' as const,
         primaryCategoryId: null,
         primarySubcategoryId: null,
         introductionVideoId: '22222222-2222-4222-8222-222222222222',
@@ -47,6 +51,8 @@ class MemoryDiscoveryRepository implements DiscoveryRepository {
       countryCode: 'JO',
       city: 'Amman',
       yearsExperience: 8,
+      certificateCount: 4,
+      highestEducationLevel: 'bachelor',
       primaryCategoryId: null,
       primarySubcategoryId: null,
       introductionVideoId: '22222222-2222-4222-8222-222222222222',
@@ -112,5 +118,15 @@ describe('CVIDEO discovery', () => {
     expect(allowed.body.data.items[0].passwordHash).toBeUndefined();
     expect(allowed.body.data.items[0].email).toBeUndefined();
     expect(allowed.body.data.items[0].storageKey).toBeUndefined();
+  });
+
+  it('applies the recruiter minimum-experience query as a number', async () => {
+    const repo = new MemoryDiscoveryRepository();
+    const app = createApp({ authService: authServiceStub(), discoveryService: new DiscoveryService(repo) });
+
+    const response = await request(app).get('/api/v1/search/candidates?minExperienceYears=4&pageSize=20').set('authorization', 'Bearer recruiter-token');
+
+    expect(response.status).toBe(200);
+    expect(repo.lastSearchFilters?.minExperienceYears).toBe(4);
   });
 });

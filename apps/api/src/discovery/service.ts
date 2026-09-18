@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DiscoveryError } from './errors.js';
 import type { DiscoveryRepository } from './repository.js';
+import type { VideoProvider } from '../media/provider.js';
 
 const visibilityInputSchema = z.object({ discoverable: z.boolean() });
 
@@ -20,7 +21,20 @@ const recruiterSearchSchema = z.object({
 const candidateIdSchema = z.string().uuid();
 
 export class DiscoveryService {
-  constructor(private readonly repository: DiscoveryRepository) {}
+  constructor(
+    private readonly repository: DiscoveryRepository,
+    private readonly videoProvider?: VideoProvider,
+  ) {}
+
+  private presentCandidate<T extends { introductionVideoProviderAssetId?: string | null }>(candidate: T) {
+    const { introductionVideoProviderAssetId, ...publicCandidate } = candidate;
+    return {
+      ...publicCandidate,
+      introductionVideoEmbedUrl: introductionVideoProviderAssetId
+        ? this.videoProvider?.getEmbedUrl?.(introductionVideoProviderAssetId) ?? null
+        : null,
+    };
+  }
 
   async getOwnVisibility(userId: string) {
     const discoverable = await this.repository.getVisibilityByUserId(userId);
@@ -51,13 +65,14 @@ export class DiscoveryService {
 
   async searchCandidates(input: unknown) {
     const filters = recruiterSearchSchema.parse(input);
-    return this.repository.searchCandidates(filters);
+    const page = await this.repository.searchCandidates(filters);
+    return { ...page, items: page.items.map((candidate) => this.presentCandidate(candidate)) };
   }
 
   async getCandidateDetail(candidateId: unknown) {
     const id = candidateIdSchema.parse(candidateId);
     const candidate = await this.repository.getCandidateDetail(id);
     if (!candidate) throw new DiscoveryError('CANDIDATE_NOT_FOUND', 404, 'Candidate not found');
-    return candidate;
+    return this.presentCandidate(candidate);
   }
 }

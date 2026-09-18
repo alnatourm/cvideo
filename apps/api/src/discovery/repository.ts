@@ -13,9 +13,12 @@ export interface RecruiterCandidateCard {
   countryCode: string;
   city: string;
   yearsExperience: number;
+  certificateCount: number;
+  highestEducationLevel: 'none' | 'high_school' | 'vocational' | 'diploma' | 'bachelor' | 'master' | 'doctorate' | 'professor';
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   introductionVideoId: string;
+  introductionVideoProviderAssetId?: string | null;
   introductionVideoUrl: string | null;
   introductionVideoThumbnailUrl: string | null;
 }

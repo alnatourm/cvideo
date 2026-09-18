@@ -72,6 +72,8 @@ export interface CandidateProfile {
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   yearsExperience: number;
+  certificateCount: number;
+  highestEducationLevel: 'none' | 'high_school' | 'vocational' | 'diploma' | 'bachelor' | 'master' | 'doctorate' | 'professor';
   professionalSummary: string | null;
   cvOriginalFilename: string | null;
   extraSubfieldIds: string[];
@@ -91,6 +93,8 @@ export interface CandidateSearchItem {
   countryCode: string;
   city: string;
   yearsExperience: number;
+  certificateCount: number;
+  highestEducationLevel: CandidateProfile['highestEducationLevel'];
   primaryCategoryId: string | null;
   primarySubcategoryId: string | null;
   introductionVideoId: string;
