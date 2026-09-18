@@ -89,6 +89,22 @@ jobs:
           mkdir -p qc-evidence
           gh issue view "${{ inputs.issue_number }}" --json number,title,body,url,state > qc-evidence/fix-agent-issue.json
           node -e "const i=require('./qc-evidence/fix-agent-issue.json'); if(!i.body.includes('cvideo-qc-signature:${{ inputs.qc_signature }}')) { console.error('Issue/signature mismatch'); process.exit(1) }"
+      - name: Validate Fix Agent AI provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${FIX_AGENT_LLM_ENDPOINT:-}" ]] || missing+=(FIX_AGENT_LLM_ENDPOINT)
+          [[ -n "${FIX_AGENT_LLM_MODEL:-}" ]] || missing+=(FIX_AGENT_LLM_MODEL)
+          [[ -n "${FIX_AGENT_LLM_API_KEY:-}" ]] || missing+=(FIX_AGENT_LLM_API_KEY)
+          if (( ${#missing[@]} > 0 )); then
+            printf '{"schemaVersion":1,"state":"NEEDS_FACTORY_CONFIGURATION","missing":["%s"]}\n' "$(IFS='","'; echo "${missing[*]}")" > qc-evidence/fix-agent-provider.json
+            gh issue comment "${{ inputs.issue_number }}" --body "⚠️ Fix Agent could not start AI repair because its provider configuration is incomplete. Missing: `${missing[*]}`. No product code was changed."
+            exit 1
+          fi
+          printf '{"schemaVersion":1,"state":"READY","endpointConfigured":true,"modelConfigured":true,"apiKeyConfigured":true}\n' > qc-evidence/fix-agent-provider.json
       - name: Generate AI repair patch
         run: node scripts/fix-agent-brain.mjs
       - name: Reject protected-control edits before commit
