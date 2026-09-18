@@ -16,33 +16,43 @@ const results = readJson(resultsPath);
 const revision = readJson(revisionPath);
 const provisioning = readJson(provisioningPath);
 
-function collect(suite, failures = [], skipped = []) {
+function collect(suite, failures = [], skipped = [], passed = []) {
   for (const spec of suite?.specs || []) for (const test of spec.tests || []) {
     const outcomes = test.results || [];
     const failed = outcomes.some((r) => r.status && !['passed','skipped'].includes(r.status));
     const wasSkipped = outcomes.length === 0 || outcomes.every((r) => r.status === 'skipped');
+    const didPass = outcomes.some((r) => r.status === 'passed');
     if (failed) failures.push({ title: spec.title, project: test.projectName, errors: outcomes.flatMap((r) => r.errors || []).map((e) => e.message || String(e)) });
     if (wasSkipped) skipped.push({ title: spec.title, project: test.projectName });
+    if (didPass) passed.push({ title: spec.title, project: test.projectName });
   }
-  for (const child of suite?.suites || []) collect(child, failures, skipped);
-  return { failures, skipped };
+  for (const child of suite?.suites || []) collect(child, failures, skipped, passed);
+  return { failures, skipped, passed };
 }
 
 const provisioningFailed = authConfigured && provisioning?.status && provisioning.status !== 'READY';
-const summary = results ? collect(results) : { failures: [], skipped: [] };
-const authSkip = summary.skipped.some((item) => /candidate|recruiter|transaction/i.test(item.title));
+const summary = results ? collect(results) : { failures: [], skipped: [], passed: [] };
+// Project-specific skips are intentional (mobile-only candidate UX and desktop-only recruiter UX).
+// Authenticated QC is proven when each required authenticated journey passed in its intended project.
+const authProof = {
+  candidate: summary.passed.some((item) => /candidate mobile account flow/i.test(item.title)),
+  recruiter: summary.passed.some((item) => /recruiter can enter search and account areas/i.test(item.title)),
+  transaction: summary.passed.some((item) => /candidate -> recruiter -> candidate critical transaction/i.test(item.title)),
+};
+const authExecuted = authConfigured && provisioning?.status === 'READY' && Object.values(authProof).every(Boolean) && summary.failures.length === 0;
 const revisionProven = Boolean(revision?.passed && revision.expectedSha === testedSha && revision.deployedSha === testedSha);
 const blockers = [];
 if (provisioningFailed) blockers.push(provisioning.status === 'CONFIG_INVALID' ? 'qc-configuration-invalid' : 'qc-provisioning-failed');
 else if (!results) blockers.push('browser-qc-not-executed');
 else if (summary.failures.length) blockers.push('browser-qc-failed');
-if (requiredAuth && (!authConfigured || provisioning?.status !== 'READY' || authSkip)) blockers.push('authenticated-qc-not-executed');
+if (requiredAuth && !authExecuted) blockers.push('authenticated-qc-not-executed');
 if (requireRevision && !revisionProven) blockers.push('deployed-commit-not-proven');
 
 const gate = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   decision: blockers.length ? 'BLOCKED' : 'READY_FOR_OWNER', testedSha, baseUrl,
-  authenticatedQc: authConfigured && provisioning?.status === 'READY' && !authSkip && results ? 'executed' : 'not-proven',
+  authenticatedQc: authExecuted ? 'executed' : 'not-proven',
+  authenticatedProof: authProof,
   provisioning: provisioning ? { status: provisioning.status, actor: provisioning.actor, reason: provisioning.reason, details: provisioning.details } : null,
   deployedRevision: revision ? { expectedSha: revision.expectedSha, deployedSha: revision.deployedSha, passed: Boolean(revision.passed) } : null,
   blockers, failures: summary.failures, skipped: summary.skipped, generatedAt: new Date().toISOString(),
