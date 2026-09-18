@@ -32,6 +32,7 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: write
 
 jobs:
   browser-qc:
@@ -107,6 +108,47 @@ jobs:
       - name: Build guarded Fix Agent execution plan
         if: always()
         run: node scripts/fix-agent-plan.mjs
+      - name: Auto-claim queued Fix Agent work
+        if: always() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE' > /tmp/fix-agent-dispatch.tsv
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('qc-evidence/fix-agent-plan.json', 'utf8'));
+          for (const x of p.plans || []) {
+            if (x.state === 'READY_TO_CLAIM') {
+              console.log([x.issueNumber, x.signature, x.sourceSha, x.severity].join('\t'));
+            }
+          }
+          NODE
+          while IFS=      - name: Upload QC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-qc-${{ github.run_id }}
+          path: |
+            tests/browser-qc/playwright-report/
+            tests/browser-qc/test-results/
+            qc-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Enforce release gate
+        if: always()
+        shell: bash
+        run: |
+          node -e "const fs=require('fs'); const g=JSON.parse(fs.readFileSync('qc-evidence/release-gate.json','utf8')); if(g.decision!=='READY_FOR_OWNER'){ console.error('Factory release blocked:', g.blockers); process.exit(1) } console.log('Factory gate: READY_FOR_OWNER')"
+\t' read -r issue signature source severity; do
+            [[ -z "${issue:-}" ]] && continue
+            echo "Dispatching Fix Agent for issue #$issue ($signature)"
+            gh workflow run fix-agent-executor.yml --ref deploy/railway-staging-v1 \
+              -f issue_number="$issue" \
+              -f qc_signature="$signature" \
+              -f source_sha="$source" \
+              -f severity="$severity"
+          done < /tmp/fix-agent-dispatch.tsv
       - name: Upload QC evidence
         if: always()
         uses: actions/upload-artifact@v4
