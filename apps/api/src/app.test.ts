@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 
 describe('CVIDEO API foundation', () => {
-  it('returns the v1 health response', async () => {
+  it('returns the v1 health response used by deployment readiness checks', async () => {
     const response = await request(createApp()).get('/api/v1/health');
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: 'ok', service: 'cvideo-api', version: 'v1' });
