@@ -18,7 +18,16 @@ function severity(failure) {
 const infrastructureBlocked = (gate.blockers || []).some((b) => ['qc-configuration-invalid','qc-provisioning-failed','browser-qc-not-executed','deployed-commit-not-proven'].includes(b));
 const defects = infrastructureBlocked ? [] : (gate.failures || []).map((failure) => {
   const sev = severity(failure);
-  const signatureSource = `${failure.project || 'unknown'}|${failure.title || 'unknown'}`.toLowerCase().replace(/\s+/g, ' ').trim();
+  const normalizedFailure = (failure.errors || []).join(' ')
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, '<url>')
+    .replace(/\b[0-9a-f]{40}\b/g, '<sha>')
+    .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/g, '<uuid>')
+    .replace(/\b\d+ms\b/g, '<duration>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 1200);
+  const signatureSource = `${failure.project || 'unknown'}|${failure.title || 'unknown'}|${normalizedFailure || 'no-error'}`;
   const signature = crypto.createHash('sha256').update(signatureSource).digest('hex').slice(0, 12);
   return {
     signature, severity: sev, title: `[QC][${sev}] ${failure.title || 'Browser QC failure'}`, project: failure.project || 'unknown',
